@@ -132,10 +132,10 @@ All changes committed to git (2 commits):
 
 | Item | Why Blocked |
 |------|-------------|
-| Method name → handler address mapping | Method names in heap at `[handler_obj+0x80]`, not in `.rdata` |
+| Method name → handler address mapping | Static method name strings EXIST in `.rdata` (all ~60 methods have `lea`/`movups` cross-references), but handler creator call sites pass method name via registers (rsi/r14/rbx), not direct string loads. Handler registration names stored in heap at `[handler_obj+0x80]`. Static strings in `.rdata` are used as kv pair VALUES for the dispatcher, NOT as handler registration names. |
 | PTX device code | JIT-compiled by CUDA driver at runtime (`cuModuleLoadData`), no embedded cubin |
 | Kernel launch configs | Runtime `cuLaunchKernel` args |
-| `iter_params` (3 discount floats) | Runtime `cuMemcpyHtoDAsync` |
+| `iter_params` (3 discount floats) | Runtime `cuMemcpyHtoDAsync` (captured at code VA 0x24bd10) |
 | Compact archive bytes | Written at runtime by `archive.open/node/close` |
 | Full solve cycle | Requires live solver execution |
 | Anti-tamper bypass | `IsDebuggerPresent`, 5× `cpuid`, `OutputDebugStringW` |
@@ -144,6 +144,7 @@ All changes committed to git (2 commits):
 
 ## 4. Key Evidence Files
 
-- `/kaggle/working/re_lab/texassolvergpu/HANDLER_VTABLE_RECON.md` — Vtable details
+- `/kaggle/working/re_lab/texassolvergpu/HANDLER_VTABLE_RECON.md` — Vtable details (both vtables, ~22 handler addresses)
+- `/kaggle/working/re_lab/texassolvergpu/STATIC_EXTENSION_RECON.md` — **NEW** — Static method name strings in `.rdata` (all ~60 methods with `lea`/`movups` cross-references), handler creator call site register tracing, CUDA runtime call site locations, loader executable analysis
 - `/kaggle/working/re_lab/texassolvergpu/FINAL_RECON_SUMMARY.md` — Overall summary
 - `/kaggle/working/re_lab/target_bin/TexasSolverGPU-0.3.0-win64\TexasSolverGpu_131.exe` — Target binary (PE32+)
