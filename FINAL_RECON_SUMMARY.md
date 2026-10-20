@@ -26,9 +26,11 @@
 - Anti-debug: `IsDebuggerPresent`, `IsProcessorFeaturePresent`, `TerminateProcess`, `GetStartupInfoW`, `QueryPerformanceCounter`, `OutputDebugStringW`
 - VRAM gate: "VRAM is below 8 GB; large trees may fail."
 - No license/activation mechanism found.
-
 ### 1.3 Native method dispatcher (fully disassembled, confirmed)
+
 **Dispatcher:** `0x140014cf0` — signature `(output* rcx, input_kv_pairs rdx, flags r8b, r9b)`
+
+**Handler vtable (NEW — statically recovered):** `0x14016ec10` — 16 entries, 15 code pointers + 1 data pointer. All 6 handler creator call sites (`0x14000634e`, `0x14000649e`, `0x140014933`, `0x1400151f3`, `0x1400328d3`, `0x140033a9a`) use this vtable. Handler function addresses: `0x14001b660`, `0x14001d3f0`, `0x14001e280`, `0x140038110`, `0x140039980`, `0x140045a60`, `0x140045690`, `0x140046480`, `0x1400465e0`, `0x140043200`, `0x140043480`, `0x140043a80`, `0x1400450a0`, `0x14002d700`, plus entry 15 = data ptr `0x140195f88`.
 - Walks 0x18-byte key/value entries (`rbx` from `rdi` to `r15`)
 - For each entry: `mov rsi,[rbx+0x10]`; `cmovne rax,rsi`; `cmp BYTE PTR [rax],0x2` (key type tag). Skip if not 0x2.
 - Calls variant accessor `0x140043b60` on key; requires result == 0x2.
@@ -51,7 +53,7 @@
 
 **Handler creator:** `0x140036d70` — called from 6 sites (`0x14000634e`, `0x14000649e`, `0x140014933`, `0x1401511f3`, `0x1400328d3`, `0x140033a9a`). Allocates handler via `0x14014fb2f`, calls IAT `0x14016da48`/`0x14016d3d8`/`0x14016d398`. Handler object layout: `[+0x0]`=vtable, `[+0x18]`/`[+0x20]`=IAT `0x14016da48` result, `[+0x38]`/`[+0x40]`=IAT `0x14016d3d8` result, `[+0x50]`/`[+0x58]`=IAT `0x14016d398` result, `[+0x68]`=IAT `0x14016d398` check result, `[+0x74]`=global `0x1411c6698`, `[+0x7c]`=valid flag, `[+0x80]`=allocated memory.
 
-**Negative result (confirmed static):** No static {method_name_string, handler_fn_ptr} table exists. Handler addresses resolved at runtime via linked list + IAT.
+**Partial static recovery:** Handler vtable at `0x14016ec10` with 15 handler function addresses recovered statically. All 6 handler creator call sites use this vtable. No static {method_name_string, handler_fn_ptr} table exists — method names stored in heap memory at `[handler_obj+0x80]`. Handler addresses resolved at runtime via linked list + IAT. See `HANDLER_VTABLE_RECON.md` for full vtable details.
 
 **Handler registration:** `0x140013910` — list insertion function with vtable call `[rax+0x8]`, global list head at `0x1411c6690`.
 

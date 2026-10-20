@@ -154,9 +154,37 @@ Instrumentation must account for anti-debug (e.g., instrument via driver/API pro
 
 ---
 
-## 7. Recommended dynamic handler recovery
+## 7. Handler VTable Recovery (Static — NEW)
+
+**Handler vtable at `0x14016ec10`** (`.rdata` section) — all 6 handler creator call sites (`0x14000634e`, `0x14000649e`, `0x140014933`, `0x1400151f3`, `0x1400328d3`, `0x140033a9a`) use this same vtable:
+
+| Entry | VA | Type |
+|-------|-----|------|
+| 0 | `0x14001b660` | Code — cleanup/destroy |
+| 1 | `0x14001d3f0` | Code — memory accessor thunk → IAT `0x14016d8c0` |
+| 2 | `0x14001e280` | Code — memory accessor thunk → IAT `0x14016d8b8` |
+| 3 | `0x140038110` | Code — substantial handler (~0x190 bytes) |
+| 4 | `0x140039980` | Code — small accessor (10 bytes) |
+| 5 | `0x14014c6aa` | IAT thunk → `0x14016d348` |
+| 6 | `0x140045a60` | Code — handler |
+| 7 | `0x140045690` | Code — large handler |
+| 8 | `0x140046480` | Code — handler |
+| 9 | `0x1400465e0` | Code — handler |
+| 10 | `0x140043200` | Code — handler |
+| 11 | `0x140043480` | Code — handler |
+| 12 | `0x140043a80` | Code — handler |
+| 13 | `0x1400450a0` | Code — handler |
+| 14 | `0x14002d700` | Code — handler |
+| 15 | `0x140195f88` | **Data pointer** (not code) |
+
+**15 code pointers recovered statically.** Handler object method names stored in heap memory at `[handler_obj+0x80]` — static method-name → handler-address mapping remains impossible without dynamic execution. See `HANDLER_VTABLE_RECON.md` for full details.
+
+---
+
+## 8. Recommended dynamic handler recovery
 
 1. Launch `TexasSolverGpu_131.exe` under a Windows/x64 emulator or instrument `nvcuda.dll` + WinSock.
 2. Hook `0x140014cf0` (dispatcher) and `0x140001840` (invoker).
 3. On each dispatch, read the type-`0x3` string value (method name) from the kv pair and log it together with the handler pointer stored at `0x8(%r12)` / the call target of `0x140001840`.
 4. Correlate with HTTP traffic on `127.0.0.1:6006` to map each `solver.*` / `desktop.*` method to its native handler address and request/response schema.
+5. Read `[handler_obj+0x80]` at runtime to extract method name strings from each handler object.
