@@ -3,7 +3,7 @@
 
 **Target:** `re_lab/target_bin/TexasSolverGPU-0.3.0-win64\TexasSolverGpu_131.exe` (PE32+ GUI, ImageBase `0x140000000`)
 **Method:** Static disassembly of handler creator call sites + vtable data in `.rdata`
-**Status:** Complete — handler vtable and 15 handler function addresses recovered statically
+**Status:** Complete — 2 handler vtables and 30+ handler function addresses recovered statically
 
 ---
 
@@ -65,7 +65,36 @@ Creator flow:
 
 ---
 
-## 3. Handler Object Layout
+## 3. Second Handler VTable at `0x14016ef90` (`.rdata`)
+
+Discovered via reference at `0x14001710d` (function `0x140017100`) and `0x14001b734` (function `0x14001b720`). Both set vtable `0x14016ef90`, call `0x14001e0c0`, then jump to IAT `0x14016d410`. This vtable has a mix of real code functions and odd-address entries (possibly thunks):
+
+| Offset | Entry | VA | Type |
+|--------|-------|-----|------|
+| `+0x00` | 0 | `0x14001b720` | Code — sets vtable `0x14016ef90`, calls `0x14001e0c0`, jumps to IAT `0x14016d410` |
+| `+0x08` | 1 | `0x140014fb65` | Odd address (6-byte spacing pattern — possible IAT thunk) |
+| `+0x10` | 2 | `0x140014fb5f` | Odd address (possible IAT thunk) |
+| `+0x18` | 3 | `0x1400382c0` | Code — real function |
+| `+0x20` | 4 | `0x140039940` | Code — real function |
+| `+0x28` | 5 | `0x140014fb59` | Odd address (possible IAT thunk) |
+| `+0x30` | 6 | `0x140045ad0` | Code — real function |
+| `+0x38` | 7 | `0x140014fb53` | Odd address (possible IAT thunk) |
+| `+0x40` | 8 | `0x140014fb4d` | Odd address (possible IAT thunk) |
+| `+0x48` | 9 | `0x140014fb47` | Odd address (possible IAT thunk) |
+| `+0x50` | 10 | `0x1400432e0` | Code — real function |
+| `+0x58` | 11 | `0x140043560` | Code — real function |
+| `+0x60` | 12 | `0x140014fb41` | Odd address (possible IAT thunk) |
+| `+0x68` | 13 | `0x140014fb3b` | Odd address (possible IAT thunk) |
+| `+0x70` | 14 | `0x140014fb35` | Odd address (possible IAT thunk) |
+| `+0x78` | 15 | `0x140195f860` | Data pointer |
+
+Entries at `0x140014fb35`–`0x140014fb65` are spaced 6 bytes apart — consistent with `jmp QWORD PTR [rip+imm32]` thunks (6 bytes each). Needs further disassembly to confirm.
+
+**Total: 2 vtables, ~22 confirmed code pointers across both.**
+
+---
+
+## 4. Handler Object Layout
 
 Recovered from creator + call site analysis:
 
@@ -87,9 +116,11 @@ Recovered from creator + call site analysis:
 ## 4. What This Enables
 
 **Statically known (no execution required):**
-- Handler vtable address: `0x14016ec10`
-- 15 handler function addresses (vtable entries 0–14)
-- All 6 handler creator call sites
+- Handler vtable 1: `0x14016ec10` (15 code pointers + 1 data ptr)
+- Handler vtable 2: `0x14016ef90` (~7 code pointers + thunks + 1 data ptr)
+- ~22 handler function addresses total
+- All 6 handler creator call sites (all use vtable 1)
+- 2 additional functions using vtable 2 (`0x140017100`, `0x14001b720`)
 - Handler object field layout
 
 **Still requires dynamic execution (Windows + GPU):**
