@@ -62,7 +62,7 @@
 **Handler creator:** `0x140036d70` — called from 6 sites. Allocates handler via `0x14014fb2f`, calls IAT `0x14016da48`/`0x14016d3d8`/`0x14016d398`. Handler object layout:
 - `[+0x0]`=vtable, `[+0x18]`/`[+0x20]`=IAT `0x14016da48` result, `[+0x38]`/`[+0x40]`=IAT `0x14016d3d8` result, `[+0x50]`/`[+0x58]`=IAT `0x14016d398` result, `[+0x68]`=IAT `0x14016d398` check result, `[+0x74]`=global `0x1411c6698`, `[+0x7c]`=valid flag, `[+0x80]`=allocated memory.
 
-**Negative result (confirmed static):** No static {method_name_string, handler_fn_ptr} table exists. Handler addresses resolved at runtime via linked list + IAT.
+**Negative result (confirmed static):** No static {method_name_string, handler_fn_ptr} table exists. Handler vtable at `0x14016ec10` with 15 handler function addresses recovered statically (see `HANDLER_VTABLE_RECON.md`), but method names stored in heap memory at `[handler_obj+0x80]` — static method-name → handler-address mapping remains impossible. Handler addresses resolved at runtime via linked list + IAT.
 
 ### 1.5 Complete native method inventory (from `dT` + strings, verified via binary disassembly)
 

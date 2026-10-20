@@ -31,7 +31,7 @@ Verified flow (from `objdump -d -M intel`):
 - `0x140001840` / `0x1400017d0` — variant string copy (allocator `0x140151238` / `0x1400017d0`).
 - `0x14001ef90` — string length helper.
 
-**Handler creator:** `0x140036d70` — called from 6 sites (`0x14000634e`, `0x14000649e`, `0x140014933`, `0x1401511f3`, `0x1400328d3`, `0x140033a9a`). Allocates handler object via `0x14014fb2f`, calls IAT `0x14016da48` / `0x14016d3d8` / `0x14016d398`. Handler object layout: `[+0x0]`=vtable, `[+0x18]`/`[+0x20]`=IAT result, `[+0x38]`/`[+0x40]`=same, `[+0x50]`/`[+0x58]`=same, `[+0x68]`=IAT `0x14016d398` result, `[+0x74]`=global `0x1411c6698`, `[+0x7c]`=valid flag, `[+0x80]`=allocated memory. **No static handler address table exists** — addresses resolved at runtime via linked list.
+**Handler creator:** `0x140036d70` — called from 6 sites (`0x14000634e`, `0x14000649e`, `0x140014933`, `0x1401511f3`, `0x1400328d3`, `0x140033a9a`). All sites use vtable `0x14016ec10`. Allocates handler object via `0x14014fb2f`, calls IAT `0x14016da48` / `0x14016d3d8` / `0x14016d398`. Handler object layout: `[+0x0]`=vtable (0x14016ec10), `[+0x18]`/`[+0x20]`=IAT `0x14016da48` result, `[+0x38]`/`[+0x40]`=IAT `0x14016d3d8` result, `[+0x50]`/`[+0x58]`=IAT `0x14016d398` result, `[+0x68]`=IAT `0x14016d398` check result, `[+0x74]`=global `0x1411c6698`, `[+0x7c]`=valid flag, `[+0x80]`=allocated memory (method name string). Vtable entries recovered: 15 code pointers + 1 data ptr at `0x14016ec10` (see `HANDLER_VTABLE_RECON.md`). **No static {method_name_string, handler_fn_ptr} table** — method names in heap memory at `[handler_obj+0x80]`.
 
 ---
 
@@ -165,19 +165,19 @@ await this.solver.confirmStopped()
 
 ## 6. Handler Address Recovery — Static Result
 
-**Negative result confirmed.** The native handler address table cannot be recovered statically because:
+**Partial static recovery.** Handler vtable at `0x14016ec10` with 15 handler function addresses recovered (see `HANDLER_VTABLE_RECON.md`). All 6 handler creator call sites use this vtable. However, method names are stored in heap memory at `[handler_obj+0x80]` — static method-name → handler-address mapping remains impossible because:
 
 - Handler objects are heap-allocated by `0x140036d70` at runtime.
 - Handler objects form a linked list (not a static array).
-- Handler method names are SSO strings stored inside each handler object.
-- Handler function pointers are stored inside handler objects, referenced via `[handler_obj+0x18]` / `[handler_obj+0x80]`.
+- Handler method names are SSO strings stored inside each handler object's allocated memory.
 - No static {method_name_string, handler_fn_ptr} table exists in .rdata or .data.
 
 **Required for dynamic recovery:**
 1. Launch `TexasSolverGpu_131.exe` under Windows/x64 emulator (Wine + Xvfb, or Windows VM).
 2. Hook `0x140014cf0` (dispatcher) — on each dispatch, read the type-0x3 string value (method name) and the handler pointer at `[r12+0x8]` / `[list_node+0x10]`.
-3. Correlate with HTTP traffic on `127.0.0.1:6006` to map each `solver.*` / `desktop.*` method to its native handler VA.
-4. Anti-tamper: `IsDebuggerPresent`, 5× `cpuid`, `OutputDebugStringW` — use API-level instrumentation (proxy `nvcuda.dll`, WinSock LSP) rather than a user-mode debugger.
+3. Read `[handler_obj+0x80]` to extract method name strings at runtime.
+4. Correlate with HTTP traffic on `127.0.0.1:6006` to map each `solver.*` / `desktop.*` method to its native handler VA.
+5. Anti-tamper: `IsDebuggerPresent`, 5× `cpuid`, `OutputDebugStringW` — use API-level instrumentation (proxy `nvcuda.dll`, WinSock LSP) rather than a user-mode debugger.
 
 ---
 

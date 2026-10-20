@@ -247,7 +247,7 @@ Instrument the dispatcher to log `(method_name, handler_VA)` pairs:
 | `PHASE3_HANDLER_MAP.md` | Native method handler map — dispatch mechanism, method inventory, dT table, anti-tamper |
 | `PHASE3_COMPACT_ARCHIVE.md` | Compact archive / strategy archive format: Avro + DEFLATE, Q16 fields, layout, validation errors, async lifecycle |
 | `PHASE3_CFR_LAUNCHERS.md` | CFR kernel launcher inventory, device buffer inventory, buffer lifetimes, CFV staging + training graph |
-| `PHASE4_STATIC_RECON.md` | Extended static recon: dispatcher disassembly, dT table, compact archive errors, frontend API usage, handler address recovery (negative), PTX status |
+| `PHASE4_STATIC_RECON.md` | Extended static recon: dispatcher disassembly, dT table, compact archive errors, frontend API usage, handler vtable recovery (partial), PTX status |
 | `PHASE5_DYNAMIC_PLAN.md` | Phase 5 dynamic analysis plan: environment setup, handler map recovery, PTX capture, compact archive decoding, kernel config, solver flow capture |
 | `phase3_json_api_recon.txt` | JSON schemas, network addresses, parser keys, validation errors (Russian-language report) |
 | `texassolver_gpu_recon.txt` | File listing of zip archive contents |
@@ -255,4 +255,4 @@ Instrument the dispatcher to log `(method_name, handler_VA)` pairs:
 
 ---
 
-**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **100% complete**. All remaining unknowns (handler addresses, PTX device code, kernel launch configs, compact archive bytes, iter_params) require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this host.
+**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **100% complete**. Handler vtable + 15 handler addresses recovered statically (`HANDLER_VTABLE_RECON.md`). Remaining unknowns (method-name → handler-address mapping, PTX device code, kernel launch configs, compact archive bytes, iter_params) require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this host.

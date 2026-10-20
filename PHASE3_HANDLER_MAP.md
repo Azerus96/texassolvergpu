@@ -2,7 +2,7 @@
 # TexasSolverGPU v0.3.0 — Phase 3: Native Method Handler Map
 
 **Target:** `re_lab/target_bin/TexasSolverGPU-0.3.0-win64/TexasSolverGpu_131.exe` (ImageBase `0x140000000`, stripped)
-**Status:** Static recovery of method *names* and dispatch *mechanism*. Per-method native **handler addresses** were NOT recovered statically (dispatch uses a variant accessor + lookup rather than a simple string→address table). Dynamic instrumentation required (see §8).
+**Status:** Static recovery of method *names* and dispatch *mechanism*. Handler vtable + 15 handler function addresses recovered statically (`HANDLER_VTABLE_RECON.md`). Per-method native handler **address mapping** was NOT recovered statically (method names in heap memory at `[handler_obj+0x80]`). Dynamic instrumentation required (see §8).
 
 Source: `strings -n 5` (`all_strings.txt`), DEEP_RE_PHASE2.md §2 (dispatcher), FRONTEND_API_RECON.md §2-§5 (dT table + transport), BINARY_ANALYSIS_RECON.md §7-§8.
 
