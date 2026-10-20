@@ -1,0 +1,221 @@
+================================================================================
+ ОТЧЕТ ФАЗЫ 3: JSON-СХЕМЫ, ПОРТЫ И API
+================================================================================
+
+
+========================================
+ ФАЙЛ: TexasSolverGPU-0.3.0-win64\TexasSolverGpu_131.exe
+========================================
+
+[1] СЕТЕВЫЕ АДРЕСА И ПОРТЫ:
+  -> 127.0.0.1:6006
+  -> http://127.0.0.1:6006
+
+[2] НАЙДЕННЫЕ JSON-ШАБЛОНЫ:
+  {"name":"pot","type":"double"}
+  {"name":"betting_round","type":"int"}
+
+[3] КЛЮЧИ ПАРСЕРА И ОШИБКИ ВАЛИДАЦИИ (Подсказки к схеме):
+  ->  Error(q(O))}async function kt(){if(Nt(),ie.value){c.value=v("tree.status_invalid_sizes");return}tt(),p.value=!0;try{it();const O=Jn(n.value.boardText);if(O.length<3||O.length>5)throw new Error(v("tre
+  ->  Human vs AI",cancelled:"Hand aborted without scoring.",missing:"The fixed preflop policy has no continuation for this line:",win:"You win",lose:"AI wins",tie:"Split pot"},_=k(()=>m.value==="zh"?ls:is
+  ->  Z=n[3+(L===0?0:c.length)+j];if(!Number.isFinite(Z)||Z<0)throw new lt("Invalid range response");C[L===0?1:0][en(P&255,P>>8)]=Z});return{seat:e,board:[...t],paid:[...s],labels:[...a],ranges:C,cards:Uin
+  ->  mono",{invalid:!!_e("ipFlopRaise")}]),"onUpdate:modelValue":A[15]||(A[15]=N=>n.value.ipFlopRaise=N),onBlur:A[16]||(A[16]=N=>ve("ipFlopRaise"))},null,34),[[ct,n.value.ipFlopRaise]]),_e("ipFlopRaise")?
+  ->  pot %",-1)),D(l("input",{"onUpdate:modelValue":e[12]||(e[12]=t=>r.bet=t),class:E(["input",{invalid:G.bet}]),inputmode:"text",autocomplete:"off",placeholder:"33, 67, 100",onInput:e[13]||(e[13]=t=>G.be
+  ->  pot %",-1)),D(l("input",{"onUpdate:modelValue":e[15]||(e[15]=t=>r.raise=t),class:E(["input",{invalid:G.raise}]),inputmode:"text",autocomplete:"off",placeholder:"75, 125",onInput:e[16]||(e[16]=t=>G.ra
+  -> ","batch.invalid_board_len":"
+  -> ","run.invalid_iterations":"
+  -> #3e7fc0";if(a==="tone-allin")return"#8f1e2c";if(a==="tone-raise"){const i=t.match(/(-?\d+(?:\.\d+)?)(?:\s*(bb))?/i),c=Number.parseFloat((n=i==null?void 0:i[1])!=null?n:"60"),_=(i!=null&&i[2]?c:c/100)/
+  -> ("Invalid board");return e.map(a=>{const n=[...a];for(let c=0;c<52;c++)for(let p=c+1;p<52;p++)(s.has(c)||s.has(p))&&(n[en(c,p)]=0);const i=Math.max(...n);if(!(i>0))throw new lt("No preflop range remai
+  -> (E.type!=="action"||E["betting round"]!==0||E.table_cards!==""||!Number.isInteger(E.player)||i[E.player]!==C.actor)throw new lt(`Invalid preflop JSON actor / street: ${j}`);if(!Number.isFinite(E.pot)|
+  -> (u!==0&&u!==1)throw new U("Invalid human solver seat");const d=Ba(...o);if(o.some(b=>n.includes(b)))throw new U("Human cards conflict with the board");const g=[...h];let f;if(h[u][d]===0){let b=0;cons
+  -> )),1),o("div",yy,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("oopFlopBet")}]),"onUpdate:modelValue":A[28]||(A[28]=N=>n.value.oopFlopBet=N),onBlur:A[29]||(A[29]=N=>ve("oopFlopBet"))},null,34),[
+  -> ),k("small",Py,u(_e("oopTurnBet")),1)):Q("",!0)])]),o("div",By,[o("span",null,u(g(v)("tree.raise")),1),o("div",Ey,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("oopTurnRaise")}]),"onUpdate:model
+  -> ,_=p-n;if(!e.canRaise[s]||!Number.isInteger(p)||p>i||_<=0||_<e.lastRaise&&p!==i)throw new lt(`Invalid raise: ${t}`);a.wager[s]=p,a.paid[s]=e.ante+p;const m=_>=e.lastRaise;m&&(a.lastRaise=_),e.seats.fo
+  -> ,board:"Board",reviewNote:"The mixed strategy actually used. Low frequency does not mean a mistake. Missing EVs or hands outside the model range are marked N/A, not assigned a made-up score.",street:"
+  -> .","batch.invalid_board_len":"
+  -> .paid)||L>Na)throw new lt("Invalid raise amount");i.paid[a]=L}else throw new lt(`Unknown action: ${n}`);if(((C=i.node)==null?void 0:C.type)==="action")return i;if(i.paid[0]!==i.paid[1])throw new lt(`M
+  -> .paid[nd(a)]}else if(n==="Check"){if(i.paid[0]!==i.paid[1])throw new lt("Invalid check")}else if(n==="All-In")i.paid[a]=Na;else if(/^Raise \d+$/.test(n)){const L=Number(n.slice(6));if(L<=Math.max(...i
+  -> 0)])]),o("div",My,[o("span",null,u(g(v)("tree.donk")),1),o("div",Fy,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("oopTurnDonk")}]),"onUpdate:modelValue":A[37]||(A[37]=N=>n.value.oopTurnDonk=N),
+  -> : Invalid size list input. Please fix red fields first.","tree.err_invalid_token":"Invalid token: {token}","tree.err_size_gt_zero":"Size must be > 0: {token}","tree.err_board_3_5":"Board must have 3 t
+  -> :r[0];if(!d)return;const h=await d.text(),S=JSON.parse(h);if(!S||typeof S!="object")throw new Error("Invalid strategy JSON.");Ru(S)}catch(f){L.value=f.message}finally{const f=l.target;f.value=""}}func
+  -> ;if(!S||!((S[1]==="all-in"?"allin":S[1])===f.kind))return!1;const K=Number.parseFloat(S[2]);return Number.isFinite(K)&&Math.abs(K-((h=f.amount)!=null?h:0))<1e-6}return!1}async function L_(l){const r=l
+  -> ;try{const G=Me.value.rangeFiles[Me.value.oopPos],D=Me.value.rangeFiles[Me.value.ipPos];if(!G||!D)throw new Error(v("quick_start.file_missing"));const[de,I]=await Promise.all([ro(s.apiBase,G),ro(s.api
+  -> =0)throw new lt("Expected HU SB preflop root");return Yn(p),p}).catch(c=>{throw s.delete(a),new Error(`Cannot load ranges/${Mr}. Check the external JSON beside the executable. ${c instanceof Error?c.m
+  -> ==2)throw new Error(`Invalid card token: ${a}`);const i=Ip.indexOf(n[0]),c=Lp.indexOf(n[1].toLowerCase());if(i<0||c<0)throw new Error(`Invalid card token: ${a}`);s.push(i*4+c)}return s}function zt(e){
+  -> >1e4+1e-6))throw new f("Solver returned invalid stacks");const _=m?s.actions.split("/").map(l=>l.trim()).filter(Boolean):[];return{kind:m?"action":i,seat:u,board:a.board,paid:r,labels:_,data:n.results
+  -> IP range is invalid (loaded broken data?)
+  -> Invalid Apache Avro DEFLATE pipeline accounting
+  -> Invalid Apache Avro encode pipeline accounting
+  -> Invalid bet amount
+  -> Invalid board length
+  -> Invalid range file path.
+  -> Invalid ranges subpath.
+  -> L:null});return{probs:m,evs:x}}function CB(e,t){const s=e[0],a=e[1];if(![s,a,t].every(Number.isFinite))throw new lt("Invalid solver pot");const n=(Math.min(s,a)-t)/2,i=Math.max(s,a)-t-n;if(n<-1e-6||i<
+  -> Math.max(...i.ranges[a]);if(p>0&&(i.ranges[a]=i.ranges[a].map(L=>L/p)),n==="Fold")return i.phase="fold",i.folded=a,i;if(n==="Call"){if(i.paid[a]>=i.paid[nd(a)])throw new lt("Invalid call");i.paid[a]=i
+  -> Missing NodeLock board alias
+  -> OOP range is invalid (loaded broken data?)
+  -> P2 range is invalid (loaded broken data?)
+  -> Solver exited with 0 iteration unexpectedly (not cancelled). target=
+  -> ass:ee(["input mono",{invalid:!!_e("oopRiverDonk")}]),"onUpdate:modelValue":A[44]||(A[44]=N=>n.value.oopRiverDonk=N),onBlur:A[45]||(A[45]=N=>ve("oopRiverDonk"))},null,34),[[ct,n.value.oopRiverDonk]]),
+  -> call"};if(r==="f"||r==="fold")return{kind:"fold"};const f=r.match(/^(bet|b|raise|r|allin|ai|a)[:=]?(-?\d+(\.\d+)?)$/);if(!f)return{kind:"unknown"};const d=Number.parseFloat(f[2]);return Number.isFinit
+  -> cent>100||!Number.isFinite(a.rakeCapBB)||a.rakeCapBB<0)throw new f("Invalid solve settings");const n=P=>a.advanced&&!P.trim()?"":sa(P),i=n(a.bet),m=n(a.raise),u=a.advanced?n(a.oopFlopBet):i,w=a.advanc
+  -> cuMipmappedArrayGetSparseProperties
+  -> e"||!["flop","multiway","showdown"].includes(re.phase)||(Le=xe.childrens)!=null&&Le.length))throw new lt(`Unexpected 6max JSON continuation: ${j} / ${ne}`)})}return _(e,yo(n,s==null?void 0:s.stack,s==
+  -> e?(y(),k("small",Eb,u(ne.value),1)):Q("",!0)]),o("label",null,[Ye(u(g(v)("tree.effective_stack"))+" ",1),Ee(o("input",{class:ee(["input mono",{glow:m.value,invalid:!!ke.value}]),type:"number",min:"1",
+  -> elled")};if(await this.ensureIdle(),u(),i&&(i.some(c=>!Number.isInteger(c)||c<0)||i[0]!==i[1]||i[0]+i[1]>e.starting_pot||e.effective_stack<0))throw new f("Invalid postflop contribution base");await n(
+  -> else if(x>0){const C=p.slice(0,x),L=p.slice(x+1),E=wm(C,L);if(!E.length)return{ok:!1,error:`Failed to parse range: ${n}`};for(const P of E)w.push(...Rr(P))}else{const C=Sm(p);if(C!=null)w.push(C);else
+  -> er((bt=qn.stack)!=null?bt:100)})}return D}async function Et(){try{const U=await ro(s.apiBase,"quick_start/datasets.json"),G=JSON.parse(String(U.text||"{}")),D=Array.isArray(G.datasets)?G.datasets:[],d
+  -> ew lt("Invalid call");a.wager[s]=n,a.paid[s]=e.ante+n}else if(t==="Check"){if(e.wager[s]!==n)throw new lt("Invalid 6max check")}else{const p=t==="All-In"?i:/^Raise \d+$/.test(t)?Number(t.slice(6)):NaN
+  -> filter(Boolean);if(H.length>ca)throw new Error(v("batch.max_25_error"));const W=[];for(const Be of H){const Ge=Jn(Be);if(Ge.length<3||Ge.length>5)throw new Error(Ue("batch.invalid_board_len",{board:Be
+  -> g(ue.value),"--stack-chip-columns-mobile":String(le.value)})),we=J(()=>Array.from(new Set(w.value.map(U=>`${U.sb}/${U.bb}`))).sort((U,G)=>{const[D,de]=U.split("/").map($e=>Number.parseFloat($e)),[I,te
+  -> g(v)("tree.bet")),1),o("div",Vb,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("ipFlopBet")}]),"onUpdate:modelValue":A[13]||(A[13]=N=>n.value.ipFlopBet=N),onBlur:A[14]||(A[14]=N=>ve("ipFlopBet"))
+  -> invalid array<T, N> subscript
+  -> invalid vector subscript
+  -> lop.","quick_start.not_playable_eff":"Not playable: effective stack <= 0 after preflop.","quick_start.file_missing":"Range file missing for selected scenario.","quick_start.scenario_cards":"Scenario C
+  -> mber.isFinite(n.value)||n.value<1?(_.value=v("run.invalid_iterations"),a("log-change",_.value),!1):!0}function me(ce){if(ce.source==="nvml"){Ie(Ue("run.vram_log",{estimated:ve(ce.estimated_peak_bytes)
+  -> n in Explorer","batch.copy_snapshot":"Copy Snapshot","batch.no_jobs":"No batch job yet.","batch.max_25_error":"At most 25 boards are allowed.","batch.invalid_board_len":"Board must have 3-5 cards: {bo
+  -> n=>n.trim()).filter(Boolean);for(const n of a){const[i,c]=n.split(":"),p=(i!=null?i:"").trim();if(!p)return{ok:!1,error:`Failed to parse range: ${n}`};let _=1;if(c!=null){const C=c.trim();let L=Number
+  -> o("div",ay,[o("div",oy,u(g(v)("tree.river_ip")),1),o("div",ly,[o("span",null,u(g(v)("tree.bet")),1),o("div",ry,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("ipRiverBet")}]),"onUpdate:modelValue
+  -> oken: ${n}`};_=L}const m=p.endsWith("+"),x=p.indexOf("-");let w=[];if(m){const C=p.slice(0,-1),L=xm(C);if(!L.length)return{ok:!1,error:`Failed to parse range: ${n}`};for(const E of L)w.push(...Rr(E))}
+  -> piBase,[]),J(this.apiBase)]),i=o.current_player;if(!["oop","ip","chance","terminal"].includes(i))throw new f(`Unexpected node: ${i}`);const m=i==="oop"||i==="ip",u=i==="oop"?1:i==="ip"?0:null,[w,h]=U(
+  -> put mono",{glow:m.value,invalid:!!ne.value}]),type:"number",min:"1",step:"1","onUpdate:modelValue":A[9]||(A[9]=N=>n.value.startingPot=N)},null,2),[[ct,n.value.startingPot,void 0,{number:!0}]]),ne.valu
+  -> r",yt=v("batch.result_missing"),xt=null,W=!0),{...Be,board:Array.from(Be.board),status:Ge,error:yt,resultKey:xt,snapshotJsonText:""}}),oe.value=Ue("batch.restored",{count:C.value.length}),W&&Nt()}catc
+  -> raise")),1),o("div",zy,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("oopRiverRaise")}]),"onUpdate:modelValue":A[42]||(A[42]=N=>n.value.oopRiverRaise=N),onBlur:A[43]||(A[43]=N=>ve("oopRiverRaise
+  -> s.v1";function nC(){var e;try{const t=JSON.parse((e=localStorage.getItem(Zp))!=null?e:"[]");return Array.isArray(t)?t.filter(s=>s&&typeof s.id=="string"&&Array.isArray(s.spots)&&s.filters):[]}catch{re
+  -> small",Zb,u(_e("ipTurnBet")),1)):Q("",!0)])]),o("div",ey,[o("span",null,u(g(v)("tree.raise")),1),o("div",ty,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("ipTurnRaise")}]),"onUpdate:modelValue":
+  -> tions","run.target_exploit":"Target Exploitability","run.run":"Run","run.stop":"Stop","run.show_result":"Show Result","run.invalid_iterations":"Run error: max iterations must be greater than zero.","r
+  -> trategy_probs)","results.nodelock_example_title":"Example (dump-style):","results.nodelock_invalid_format":"Invalid lock input format.","results.nodelock_tip":"Node lock takes effect in the next solve
+  -> urn ra(p).split(",").map(e=>`${e}%`).join(",")}function wa(p,e,o,a,s=1e4){if(o[0]!==o[1]||o[0]>=s||e.length!==3)throw new f("Invalid flop entry");if(!Number.isInteger(a.maxRaises)||a.maxRaises<1||a.ma
+  -> urn"Call";if(G==="check")return"Check";if(G==="fold")return"Fold";if(G==="allin")return"AllIn";const D=G.match(/^(\d+(?:\.\d+)?)bb$/);return D?`${Number.parseFloat(D[1]).toFixed(1)}bb`:U.trim()}functi
+  -> ut mono",{invalid:!!_e("ipTurnBet")}]),"onUpdate:modelValue":A[18]||(A[18]=N=>n.value.ipTurnBet=N),onBlur:A[19]||(A[19]=N=>ve("ipTurnBet"))},null,34),[[ct,n.value.ipTurnBet]]),_e("ipTurnBet")?(y(),k("
+  -> ut mono",{invalid:!!_e("oopTurnBet")}]),"onUpdate:modelValue":A[33]||(A[33]=N=>n.value.oopTurnBet=N),onBlur:A[34]||(A[34]=N=>ve("oopTurnBet"))},null,34),[[ct,n.value.oopTurnBet]]),_e("oopTurnBet")?(y(
+  -> uy,[o("span",null,u(g(v)("tree.raise")),1),o("div",cy,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("ipRiverRaise")}]),"onUpdate:modelValue":A[25]||(A[25]=N=>n.value.ipRiverRaise=N),onBlur:A[26]
+  -> ver_oop")),1),o("div",Dy,[o("span",null,u(g(v)("tree.bet")),1),o("div",Uy,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("oopRiverBet")}]),"onUpdate:modelValue":A[40]||(A[40]=N=>n.value.oopRiverB
+  -> {const L=Rr(p);if(!L.length)return{ok:!1,error:`Failed to parse range: ${n}`};w.push(...L)}}if(!w.length)return{ok:!1,error:`Failed to parse range: ${n}`};for(const C of w)t[C]=_}return{ok:!0,range:t}
+  -> |Math.abs(E.pot-C.paid.reduce((ne,ke)=>ne+ke,0))>1e-6)throw new lt(`Invalid 6max JSON pot: ${j}`);if(s!=null&&s.allowIncomplete&&((oe=(Z=E.strategy)==null?void 0:Z.card_strings)==null?void 0:oe.length
+
+[4] ВЫЗОВЫ JAVASCRIPT (FETCH / API):
+  (Явных вызовов fetch() не найдено)
+
+========================================
+ ФАЙЛ: TexasSolverGPU-0.3.0-win64\TexasSolverGpu.exe
+========================================
+
+[1] СЕТЕВЫЕ АДРЕСА И ПОРТЫ:
+  (Не найдено явных портов)
+
+[2] НАЙДЕННЫЕ JSON-ШАБЛОНЫ:
+  (Готовых JSON-строк не найдено, ключи собираются динамически)
+
+[3] КЛЮЧИ ПАРСЕРА И ОШИБКИ ВАЛИДАЦИИ (Подсказки к схеме):
+
+[4] ВЫЗОВЫ JAVASCRIPT (FETCH / API):
+  (Явных вызовов fetch() не найдено)
+
+========================================
+ ФАЙЛ: TexasSolverGPU-0.3.0-win64\TexasSolverGpu_legacy_126.exe
+========================================
+
+[1] СЕТЕВЫЕ АДРЕСА И ПОРТЫ:
+  -> 127.0.0.1:6006
+  -> http://127.0.0.1:6006
+
+[2] НАЙДЕННЫЕ JSON-ШАБЛОНЫ:
+  {"name":"pot","type":"double"}
+  {"name":"betting_round","type":"int"}
+
+[3] КЛЮЧИ ПАРСЕРА И ОШИБКИ ВАЛИДАЦИИ (Подсказки к схеме):
+  ->  Error(q(O))}async function kt(){if(Nt(),ie.value){c.value=v("tree.status_invalid_sizes");return}tt(),p.value=!0;try{it();const O=Jn(n.value.boardText);if(O.length<3||O.length>5)throw new Error(v("tre
+  ->  Human vs AI",cancelled:"Hand aborted without scoring.",missing:"The fixed preflop policy has no continuation for this line:",win:"You win",lose:"AI wins",tie:"Split pot"},_=k(()=>m.value==="zh"?ls:is
+  ->  Z=n[3+(L===0?0:c.length)+j];if(!Number.isFinite(Z)||Z<0)throw new lt("Invalid range response");C[L===0?1:0][en(P&255,P>>8)]=Z});return{seat:e,board:[...t],paid:[...s],labels:[...a],ranges:C,cards:Uin
+  ->  mono",{invalid:!!_e("ipFlopRaise")}]),"onUpdate:modelValue":A[15]||(A[15]=N=>n.value.ipFlopRaise=N),onBlur:A[16]||(A[16]=N=>ve("ipFlopRaise"))},null,34),[[ct,n.value.ipFlopRaise]]),_e("ipFlopRaise")?
+  ->  pot %",-1)),D(l("input",{"onUpdate:modelValue":e[12]||(e[12]=t=>r.bet=t),class:E(["input",{invalid:G.bet}]),inputmode:"text",autocomplete:"off",placeholder:"33, 67, 100",onInput:e[13]||(e[13]=t=>G.be
+  ->  pot %",-1)),D(l("input",{"onUpdate:modelValue":e[15]||(e[15]=t=>r.raise=t),class:E(["input",{invalid:G.raise}]),inputmode:"text",autocomplete:"off",placeholder:"75, 125",onInput:e[16]||(e[16]=t=>G.ra
+  -> ","batch.invalid_board_len":"
+  -> ","run.invalid_iterations":"
+  -> #3e7fc0";if(a==="tone-allin")return"#8f1e2c";if(a==="tone-raise"){const i=t.match(/(-?\d+(?:\.\d+)?)(?:\s*(bb))?/i),c=Number.parseFloat((n=i==null?void 0:i[1])!=null?n:"60"),_=(i!=null&&i[2]?c:c/100)/
+  -> ("Invalid board");return e.map(a=>{const n=[...a];for(let c=0;c<52;c++)for(let p=c+1;p<52;p++)(s.has(c)||s.has(p))&&(n[en(c,p)]=0);const i=Math.max(...n);if(!(i>0))throw new lt("No preflop range remai
+  -> (E.type!=="action"||E["betting round"]!==0||E.table_cards!==""||!Number.isInteger(E.player)||i[E.player]!==C.actor)throw new lt(`Invalid preflop JSON actor / street: ${j}`);if(!Number.isFinite(E.pot)|
+  -> (u!==0&&u!==1)throw new U("Invalid human solver seat");const d=Ba(...o);if(o.some(b=>n.includes(b)))throw new U("Human cards conflict with the board");const g=[...h];let f;if(h[u][d]===0){let b=0;cons
+  -> )),1),o("div",yy,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("oopFlopBet")}]),"onUpdate:modelValue":A[28]||(A[28]=N=>n.value.oopFlopBet=N),onBlur:A[29]||(A[29]=N=>ve("oopFlopBet"))},null,34),[
+  -> ),k("small",Py,u(_e("oopTurnBet")),1)):Q("",!0)])]),o("div",By,[o("span",null,u(g(v)("tree.raise")),1),o("div",Ey,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("oopTurnRaise")}]),"onUpdate:model
+  -> ,_=p-n;if(!e.canRaise[s]||!Number.isInteger(p)||p>i||_<=0||_<e.lastRaise&&p!==i)throw new lt(`Invalid raise: ${t}`);a.wager[s]=p,a.paid[s]=e.ante+p;const m=_>=e.lastRaise;m&&(a.lastRaise=_),e.seats.fo
+  -> ,board:"Board",reviewNote:"The mixed strategy actually used. Low frequency does not mean a mistake. Missing EVs or hands outside the model range are marked N/A, not assigned a made-up score.",street:"
+  -> .","batch.invalid_board_len":"
+  -> .paid)||L>Na)throw new lt("Invalid raise amount");i.paid[a]=L}else throw new lt(`Unknown action: ${n}`);if(((C=i.node)==null?void 0:C.type)==="action")return i;if(i.paid[0]!==i.paid[1])throw new lt(`M
+  -> .paid[nd(a)]}else if(n==="Check"){if(i.paid[0]!==i.paid[1])throw new lt("Invalid check")}else if(n==="All-In")i.paid[a]=Na;else if(/^Raise \d+$/.test(n)){const L=Number(n.slice(6));if(L<=Math.max(...i
+  -> 0)])]),o("div",My,[o("span",null,u(g(v)("tree.donk")),1),o("div",Fy,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("oopTurnDonk")}]),"onUpdate:modelValue":A[37]||(A[37]=N=>n.value.oopTurnDonk=N),
+  -> : Invalid size list input. Please fix red fields first.","tree.err_invalid_token":"Invalid token: {token}","tree.err_size_gt_zero":"Size must be > 0: {token}","tree.err_board_3_5":"Board must have 3 t
+  -> :r[0];if(!d)return;const h=await d.text(),S=JSON.parse(h);if(!S||typeof S!="object")throw new Error("Invalid strategy JSON.");Ru(S)}catch(f){L.value=f.message}finally{const f=l.target;f.value=""}}func
+  -> ;if(!S||!((S[1]==="all-in"?"allin":S[1])===f.kind))return!1;const K=Number.parseFloat(S[2]);return Number.isFinite(K)&&Math.abs(K-((h=f.amount)!=null?h:0))<1e-6}return!1}async function L_(l){const r=l
+  -> ;try{const G=Me.value.rangeFiles[Me.value.oopPos],D=Me.value.rangeFiles[Me.value.ipPos];if(!G||!D)throw new Error(v("quick_start.file_missing"));const[de,I]=await Promise.all([ro(s.apiBase,G),ro(s.api
+  -> =0)throw new lt("Expected HU SB preflop root");return Yn(p),p}).catch(c=>{throw s.delete(a),new Error(`Cannot load ranges/${Mr}. Check the external JSON beside the executable. ${c instanceof Error?c.m
+  -> ==2)throw new Error(`Invalid card token: ${a}`);const i=Ip.indexOf(n[0]),c=Lp.indexOf(n[1].toLowerCase());if(i<0||c<0)throw new Error(`Invalid card token: ${a}`);s.push(i*4+c)}return s}function zt(e){
+  -> >1e4+1e-6))throw new f("Solver returned invalid stacks");const _=m?s.actions.split("/").map(l=>l.trim()).filter(Boolean):[];return{kind:m?"action":i,seat:u,board:a.board,paid:r,labels:_,data:n.results
+  -> IP range is invalid (loaded broken data?)
+  -> Invalid Apache Avro DEFLATE pipeline accounting
+  -> Invalid Apache Avro encode pipeline accounting
+  -> Invalid bet amount
+  -> Invalid board length
+  -> Invalid range file path.
+  -> Invalid ranges subpath.
+  -> L:null});return{probs:m,evs:x}}function CB(e,t){const s=e[0],a=e[1];if(![s,a,t].every(Number.isFinite))throw new lt("Invalid solver pot");const n=(Math.min(s,a)-t)/2,i=Math.max(s,a)-t-n;if(n<-1e-6||i<
+  -> Math.max(...i.ranges[a]);if(p>0&&(i.ranges[a]=i.ranges[a].map(L=>L/p)),n==="Fold")return i.phase="fold",i.folded=a,i;if(n==="Call"){if(i.paid[a]>=i.paid[nd(a)])throw new lt("Invalid call");i.paid[a]=i
+  -> Missing NodeLock board alias
+  -> OOP range is invalid (loaded broken data?)
+  -> P2 range is invalid (loaded broken data?)
+  -> Solver exited with 0 iteration unexpectedly (not cancelled). target=
+  -> ass:ee(["input mono",{invalid:!!_e("oopRiverDonk")}]),"onUpdate:modelValue":A[44]||(A[44]=N=>n.value.oopRiverDonk=N),onBlur:A[45]||(A[45]=N=>ve("oopRiverDonk"))},null,34),[[ct,n.value.oopRiverDonk]]),
+  -> call"};if(r==="f"||r==="fold")return{kind:"fold"};const f=r.match(/^(bet|b|raise|r|allin|ai|a)[:=]?(-?\d+(\.\d+)?)$/);if(!f)return{kind:"unknown"};const d=Number.parseFloat(f[2]);return Number.isFinit
+  -> cent>100||!Number.isFinite(a.rakeCapBB)||a.rakeCapBB<0)throw new f("Invalid solve settings");const n=P=>a.advanced&&!P.trim()?"":sa(P),i=n(a.bet),m=n(a.raise),u=a.advanced?n(a.oopFlopBet):i,w=a.advanc
+  -> e"||!["flop","multiway","showdown"].includes(re.phase)||(Le=xe.childrens)!=null&&Le.length))throw new lt(`Unexpected 6max JSON continuation: ${j} / ${ne}`)})}return _(e,yo(n,s==null?void 0:s.stack,s==
+  -> e?(y(),k("small",Eb,u(ne.value),1)):Q("",!0)]),o("label",null,[Ye(u(g(v)("tree.effective_stack"))+" ",1),Ee(o("input",{class:ee(["input mono",{glow:m.value,invalid:!!ke.value}]),type:"number",min:"1",
+  -> elled")};if(await this.ensureIdle(),u(),i&&(i.some(c=>!Number.isInteger(c)||c<0)||i[0]!==i[1]||i[0]+i[1]>e.starting_pot||e.effective_stack<0))throw new f("Invalid postflop contribution base");await n(
+  -> else if(x>0){const C=p.slice(0,x),L=p.slice(x+1),E=wm(C,L);if(!E.length)return{ok:!1,error:`Failed to parse range: ${n}`};for(const P of E)w.push(...Rr(P))}else{const C=Sm(p);if(C!=null)w.push(C);else
+  -> er((bt=qn.stack)!=null?bt:100)})}return D}async function Et(){try{const U=await ro(s.apiBase,"quick_start/datasets.json"),G=JSON.parse(String(U.text||"{}")),D=Array.isArray(G.datasets)?G.datasets:[],d
+  -> ew lt("Invalid call");a.wager[s]=n,a.paid[s]=e.ante+n}else if(t==="Check"){if(e.wager[s]!==n)throw new lt("Invalid 6max check")}else{const p=t==="All-In"?i:/^Raise \d+$/.test(t)?Number(t.slice(6)):NaN
+  -> filter(Boolean);if(H.length>ca)throw new Error(v("batch.max_25_error"));const W=[];for(const Be of H){const Ge=Jn(Be);if(Ge.length<3||Ge.length>5)throw new Error(Ue("batch.invalid_board_len",{board:Be
+  -> g(ue.value),"--stack-chip-columns-mobile":String(le.value)})),we=J(()=>Array.from(new Set(w.value.map(U=>`${U.sb}/${U.bb}`))).sort((U,G)=>{const[D,de]=U.split("/").map($e=>Number.parseFloat($e)),[I,te
+  -> g(v)("tree.bet")),1),o("div",Vb,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("ipFlopBet")}]),"onUpdate:modelValue":A[13]||(A[13]=N=>n.value.ipFlopBet=N),onBlur:A[14]||(A[14]=N=>ve("ipFlopBet"))
+  -> invalid array<T, N> subscript
+  -> invalid vector subscript
+  -> lop.","quick_start.not_playable_eff":"Not playable: effective stack <= 0 after preflop.","quick_start.file_missing":"Range file missing for selected scenario.","quick_start.scenario_cards":"Scenario C
+  -> mber.isFinite(n.value)||n.value<1?(_.value=v("run.invalid_iterations"),a("log-change",_.value),!1):!0}function me(ce){if(ce.source==="nvml"){Ie(Ue("run.vram_log",{estimated:ve(ce.estimated_peak_bytes)
+  -> n in Explorer","batch.copy_snapshot":"Copy Snapshot","batch.no_jobs":"No batch job yet.","batch.max_25_error":"At most 25 boards are allowed.","batch.invalid_board_len":"Board must have 3-5 cards: {bo
+  -> n=>n.trim()).filter(Boolean);for(const n of a){const[i,c]=n.split(":"),p=(i!=null?i:"").trim();if(!p)return{ok:!1,error:`Failed to parse range: ${n}`};let _=1;if(c!=null){const C=c.trim();let L=Number
+  -> o("div",ay,[o("div",oy,u(g(v)("tree.river_ip")),1),o("div",ly,[o("span",null,u(g(v)("tree.bet")),1),o("div",ry,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("ipRiverBet")}]),"onUpdate:modelValue
+  -> oken: ${n}`};_=L}const m=p.endsWith("+"),x=p.indexOf("-");let w=[];if(m){const C=p.slice(0,-1),L=xm(C);if(!L.length)return{ok:!1,error:`Failed to parse range: ${n}`};for(const E of L)w.push(...Rr(E))}
+  -> piBase,[]),J(this.apiBase)]),i=o.current_player;if(!["oop","ip","chance","terminal"].includes(i))throw new f(`Unexpected node: ${i}`);const m=i==="oop"||i==="ip",u=i==="oop"?1:i==="ip"?0:null,[w,h]=U(
+  -> put mono",{glow:m.value,invalid:!!ne.value}]),type:"number",min:"1",step:"1","onUpdate:modelValue":A[9]||(A[9]=N=>n.value.startingPot=N)},null,2),[[ct,n.value.startingPot,void 0,{number:!0}]]),ne.valu
+  -> r",yt=v("batch.result_missing"),xt=null,W=!0),{...Be,board:Array.from(Be.board),status:Ge,error:yt,resultKey:xt,snapshotJsonText:""}}),oe.value=Ue("batch.restored",{count:C.value.length}),W&&Nt()}catc
+  -> raise")),1),o("div",zy,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("oopRiverRaise")}]),"onUpdate:modelValue":A[42]||(A[42]=N=>n.value.oopRiverRaise=N),onBlur:A[43]||(A[43]=N=>ve("oopRiverRaise
+  -> s.v1";function nC(){var e;try{const t=JSON.parse((e=localStorage.getItem(Zp))!=null?e:"[]");return Array.isArray(t)?t.filter(s=>s&&typeof s.id=="string"&&Array.isArray(s.spots)&&s.filters):[]}catch{re
+  -> small",Zb,u(_e("ipTurnBet")),1)):Q("",!0)])]),o("div",ey,[o("span",null,u(g(v)("tree.raise")),1),o("div",ty,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("ipTurnRaise")}]),"onUpdate:modelValue":
+  -> tions","run.target_exploit":"Target Exploitability","run.run":"Run","run.stop":"Stop","run.show_result":"Show Result","run.invalid_iterations":"Run error: max iterations must be greater than zero.","r
+  -> trategy_probs)","results.nodelock_example_title":"Example (dump-style):","results.nodelock_invalid_format":"Invalid lock input format.","results.nodelock_tip":"Node lock takes effect in the next solve
+  -> urn ra(p).split(",").map(e=>`${e}%`).join(",")}function wa(p,e,o,a,s=1e4){if(o[0]!==o[1]||o[0]>=s||e.length!==3)throw new f("Invalid flop entry");if(!Number.isInteger(a.maxRaises)||a.maxRaises<1||a.ma
+  -> urn"Call";if(G==="check")return"Check";if(G==="fold")return"Fold";if(G==="allin")return"AllIn";const D=G.match(/^(\d+(?:\.\d+)?)bb$/);return D?`${Number.parseFloat(D[1]).toFixed(1)}bb`:U.trim()}functi
+  -> ut mono",{invalid:!!_e("ipTurnBet")}]),"onUpdate:modelValue":A[18]||(A[18]=N=>n.value.ipTurnBet=N),onBlur:A[19]||(A[19]=N=>ve("ipTurnBet"))},null,34),[[ct,n.value.ipTurnBet]]),_e("ipTurnBet")?(y(),k("
+  -> ut mono",{invalid:!!_e("oopTurnBet")}]),"onUpdate:modelValue":A[33]||(A[33]=N=>n.value.oopTurnBet=N),onBlur:A[34]||(A[34]=N=>ve("oopTurnBet"))},null,34),[[ct,n.value.oopTurnBet]]),_e("oopTurnBet")?(y(
+  -> uy,[o("span",null,u(g(v)("tree.raise")),1),o("div",cy,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("ipRiverRaise")}]),"onUpdate:modelValue":A[25]||(A[25]=N=>n.value.ipRiverRaise=N),onBlur:A[26]
+  -> ver_oop")),1),o("div",Dy,[o("span",null,u(g(v)("tree.bet")),1),o("div",Uy,[Ee(o("input",{class:ee(["input mono",{invalid:!!_e("oopRiverBet")}]),"onUpdate:modelValue":A[40]||(A[40]=N=>n.value.oopRiverB
+  -> {const L=Rr(p);if(!L.length)return{ok:!1,error:`Failed to parse range: ${n}`};w.push(...L)}}if(!w.length)return{ok:!1,error:`Failed to parse range: ${n}`};for(const C of w)t[C]=_}return{ok:!0,range:t}
+  -> |Math.abs(E.pot-C.paid.reduce((ne,ke)=>ne+ke,0))>1e-6)throw new lt(`Invalid 6max JSON pot: ${j}`);if(s!=null&&s.allowIncomplete&&((oe=(Z=E.strategy)==null?void 0:Z.card_strings)==null?void 0:oe.length
+
+[4] ВЫЗОВЫ JAVASCRIPT (FETCH / API):
+  (Явных вызовов fetch() не найдено)
+
+========================================
+ ФАЙЛ: TexasSolverGPU-0.3.0-win64\WebView2Loader.dll
+========================================
+
+[1] СЕТЕВЫЕ АДРЕСА И ПОРТЫ:
+  (Не найдено явных портов)
+
+[2] НАЙДЕННЫЕ JSON-ШАБЛОНЫ:
+  (Готовых JSON-строк не найдено, ключи собираются динамически)
+
+[3] КЛЮЧИ ПАРСЕРА И ОШИБКИ ВАЛИДАЦИИ (Подсказки к схеме):
+
+[4] ВЫЗОВЫ JAVASCRIPT (FETCH / API):
+  (Явных вызовов fetch() не найдено)
