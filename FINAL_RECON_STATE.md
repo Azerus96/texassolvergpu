@@ -876,4 +876,104 @@ These strings were found in the binary's string table but are NOT in the dT tabl
 - **No Windows/x64 + NVIDIA GPU:** All Phase 5 dynamic items remain blocked.
 - **Static analysis:** 100% complete. No further static analysis can resolve the remaining unknowns.
 
-**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **100% complete**. All binaries disassembled, all frontend assets extracted (including Vue 3 PlayPanel `ya` class with complete solve flow), all API endpoints/schemas documented (20-method if-else chain + 23 cross-referenced methods + direct native calls for `solver.policy`/`solver.possibleCards`/etc.), all handler vtables recovered (15+15 entries), complete static method dispatch chain recovered, all CUDA kernels identified and SASS-disassembled via `nvdisasm` (270 files across 6 architectures), all data structures reconstructed, all anti-tamper surfaces mapped (16 techniques), and SASS-level algorithmic details extracted for key kernels (backward_player regret matching, evaluate_showdown showdown evaluation, train_small_tree_fp32_multi_iter multi-iteration CFR, forward_river_subtrees_packed river forward, backward_chance_turn_river chance backward). Proxy DLL, compact archive decoder, and CFR simulator are ready for use on Windows + GPU. The only remaining unknowns require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this Linux host.
+## 25. NEWLY DOCUMENTED SASS KERNELS (Deep Static Analysis)
+
+The following 10 kernels were reverse-engineered at the SASS instruction level and are NOT covered in §12. Full details in `SASS_KERNEL_DEEP_RECON.md`.
+
+| Kernel | File | Instructions | Algorithm |
+|--------|------|-------------|-----------|
+| `backward_player_cfv_packed` | `backward_player_cfv_packed.txt` | 601 | Packed CFV backward, Q16 dequant, regret matching, MUFU.RCP normalization |
+| `backward_player_packed` | `backward_player_packed.txt` | ~790 | S16 packed regrets, 8-action blocks, signed fixed-point |
+| `backward_opponent` | `backward_opponent.txt` | 361 | Opponent CFV averaging, 1/num_outcomes chance weighting |
+| `backward_chance_abstract` | `backward_chance_abstract.txt` | 161 | Abstract chance node backward, dead-card check (-1), 4 outcomes |
+| `forward_opponent` | `forward_opponent.txt` | 505 | Opponent reach propagation, warp reduction (SHFL.DOWN), epsilon normalization |
+| `apply_isomorphism` | `apply_isomorphism.txt` | 97 | Tree compaction, child pointer swap, value accumulation |
+| `encode_stage_segments_i16` | `encode_stage_segments_i16.txt` | 249 | i16 encoding, warp max reduction, Newton-Raphson scale refinement |
+| `gather_cfv` | `gather_cfv.txt` | 41 | Simple gather/scatter: out[tid] = src_table[indices[tid]] |
+| `evaluate_fold` | `evaluate_fold.txt` | 665 | Fold equity evaluation, Q16, board card extraction |
+| `train_small_tree_fp32_multi_iter` | `train_small_tree_fp32_multi_iter.txt` | 3401 | Multi-iter CFR, variable constant buffer (c[0x0][R37+off]), FFMA chains |
+
+**Updated kernel documentation coverage: 10/45 kernels (was 7/45). Remaining: 35 kernels.**
+
+---
+
+## 26. CUDA DRIVER API CALL SITES (Source Variable Names)
+
+Full details in `CUDA_API_CALL_SITES.md`. Extracted C++ source variable names from `.rdata` strings:
+
+| Code VA | API Call | Source Variable |
+|---------|----------|-----------------|
+| `0x24aeb0` | `cuGraphLaunch(training_graph_exec_, stream_)` | `training_graph_exec_`, `stream_` |
+| `0x24bd10` | `cuMemcpyHtoDAsync(d_discount_params_.dev_ptr(), iter_params, 3*sizeof(float), stream_)` | `d_discount_params_`, `iter_params` (3 floats) |
+| `0x24ade0` | `cuMemcpyDtoDAsync(d_cfreach_.dev_ptr(), d_init_weights_[opponent].dev_ptr(), nho*sizeof(float), stream_)` | `d_cfreach_`, `d_init_weights_[opponent]`, `nho` |
+| `0x24b1b0` | `cuMemcpyDtoHAsync(cfv_stage_host_, d_cfv_stage_i16_.dev_ptr(), chunk_elements*sizeof(int16_t), stream_dl_)` | `cfv_stage_host_`, `d_cfv_stage_i16_`, `stream_dl_` |
+| `0x24b870` | `cuMemcpyDtoHAsync(pinned_file_staging_, d_strategy_packed_.dev_ptr()+offset, chunk, stream_file_)` | `pinned_file_staging_`, `d_strategy_packed_`, `stream_file_` |
+
+**NVML functions:** `nvmlInit_v2`, `nvmlShutdown`, `nvmlDeviceGetMemoryInfo`, `nvmlDeviceGetHandleByPciBusId_v2`
+
+**Streams:** `stream_`, `stream2_`, `stream_dl_`, `stream_file_`
+**Events:** `event_fwd_done_`, `event_show_done_`, `event_cfv_stage_ready_`, `event_cfv_stage_free_` (all `CU_EVENT_DISABLE_TIMING`)
+
+---
+
+## 27. FRONTEND SOURCE CODE DEEP RECON
+
+Full details in `FRONTEND_SOURCE_DEEP_RECON.md`. The embedded Vue 3 frontend (32,289 lines in `all_strings.txt`) includes:
+
+### Components
+- `PlayPanel` (`ya` class) — complete solve flow with 13 direct API calls
+- `RunSolverPanel` — solver run control with VRAM preflight
+- `BatchSolverPanel` — multi-board batch solver with IndexedDB persistence
+- `QuickStart` — preflop scenario picker with chip scaling
+- `StrategyMatrix` — 13x13 hand grid with strategy/EV heatmap
+- `StrategyInspector` — per-seat detailed strategy view
+- `Nodelock Designer` — global/hand/cell/bias strategy override
+- `PracticeDrills` — hand scoring with mistake detection (best/mixed/inaccuracy/mistake/blunder)
+
+### IndexedDB Persistence
+- **Database:** `texassolver-gpu` (version 1)
+- **Object stores:** `batch_manifests` (key: "active"), `batch_results` (keyPath: "key")
+- **Batch lock:** `navigator.locks.request("texassolver-gpu-batch-persistence", exclusive)`
+- **Max boards:** 25, **Max export nodes:** 100000, **Persistence limit:** 64 MB
+
+### Key Source Paths (from binary)
+- `C:\Users\bupticybee\projects\gpu_solver\solver-cpp\src\gpu_solver.cpp`
+- `C:\Users\bupticybee\projects\gpu_solver\solver-cpp\src\gpu_solver_3p.cpp`
+- `C:\Users\bupticybee\projects\gpu_solver\solver-cpp\src\cuda_driver_api.cpp`
+- `C:\Users\bupticybee\projects\gpu_solver\solver-cpp\include\poker\cuda_buffer.h`
+- `C:\Users\bupticybee\projects\gpu_solver\solver-cpp\include\poker\cuda_host_memory.h`
+
+**Author:** bupticybee | **Discord:** https://discord.gg/RtyD4vRy2e | **GitHub:** https://github.com/bupticybee
+
+---
+
+## 28. UPDATED DELIVERABLES STATUS
+
+| Deliverable | Status | Location |
+|-------------|--------|----------|
+| Binary inventory & PE structure | ✅ Complete | FINAL_RECON_STATE.md §1-2 |
+| CUDA kernel inventory (45 kernels) | ✅ Complete | FINAL_RECON_STATE.md §5 |
+| CUDA mathematics | ✅ Complete | CUDA_MATH.md |
+| C++ data structures | ✅ Complete | CPP_CORE_RECON.md |
+| Native method dispatcher | ✅ Complete | DEEP_RE_PHASE2.md |
+| Handler vtables (~22 addresses) | ✅ Complete | HANDLER_VTABLE_RECON.md |
+| Method dispatch chain (19+23 methods) | ✅ Complete | HANDLER_DISPATCH_RECON.md |
+| SASS disassembly (270 files, 6 archs) | ✅ Complete | /tmp/opencode/sass_disasm/<arch>/ |
+| SASS-level algorithmic details | ✅ 10/45 kernels | SASS_KERNEL_DEEP_RECON.md, §12, §25 |
+| CUDA driver API call sites | ✅ Complete | CUDA_API_CALL_SITES.md (§26) |
+| Q16 + compact archive format | ✅ Complete | PHASE3_COMPACT_ARCHIVE.md |
+| Frontend source code | ✅ Complete | FRONTEND_SOURCE_DEEP_RECON.md (§27) |
+| Transport/bridge protocol | ✅ Complete | FRONTEND_API_RECON.md |
+| JSON schemas | ✅ Complete | FRONTEND_API_RECON.md §4 |
+| Anti-tamper surface | ✅ Complete | ANTI_TAMPER_BYPASS.md |
+| NVML usage | ✅ Complete | CUDA_API_CALL_SITES.md (§26) |
+| Method → handler VA mapping | ❌ Blocked (dynamic) | Requires Windows + GPU |
+| Kernel launch configurations | ❌ Blocked (dynamic) | Requires Windows + GPU |
+| iter_params capture | ❌ Blocked (dynamic) | Requires Windows + GPU |
+| Compact archive bytes | ❌ Blocked (dynamic) | Requires Windows + GPU |
+| Full solve cycle | ❌ Blocked (dynamic) | Requires Windows + GPU |
+| Dynamic anti-tamper validation | ❌ Blocked (dynamic) | Requires Windows + GPU |
+
+**Tools Created:** Proxy nvcuda.dll (`/tmp/opencode/wine_stubs/`), compact_archive_decoder.py, CFR simulator (`cfr_simulator.py`), SASS deep recon docs.
+
+**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **substantially complete** (all binaries, all 45 kernels disassembled, 10/45 with algorithmic SASS documentation, complete frontend source extracted, all CUDA API call sites with source variable names recovered, all anti-tamper mapped). Remaining unknowns require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this Linux host.
