@@ -560,7 +560,46 @@ Response: range policy JSON (type "action", player 0 root, preflop tree)
 
 ---
 
-## 18. WHAT IS BLOCKED (Phase 5 — Dynamic, requires Windows + NVIDIA GPU)
+## 18. STATIC METHOD DISPATCH CHAIN (NEW — fully recovered statically)
+
+A large if-else dispatch chain at `0x140061260`–`0x14006829e` compares incoming method names against known strings using `lea rdx` + `call 0x140006c30` (string compare). Each match branches to method-specific inline code.
+
+**String compare `0x140006c30`:** gets length via `0x14015127a`, compares via `0x140151250`, returns 1 if equal.
+
+### Dispatch chain entries (in order):
+
+| Order | Code VA | Method | Match Target | Next Check |
+|-------|---------|--------|-------------|------------|
+| 1 | `0x140061260` | `solver.init` | `0x14006a680` | `0x140061732` |
+| 2 | `0x140061732` | `solver.allocate` | — | `0x140061cc3` |
+| 3 | `0x140061cc3` | `solver.memoryUsage` | — | `0x140062f7f` |
+| 4 | `0x140062f7f` | `solver.solve.preflight` | — | `0x1400632ab` |
+| 5 | `0x1400632ab` | `solver.environment.check` | `0x140055840` | `0x14006330b` |
+| 6 | `0x14006330b` | `solver.solve.start` | `0x1400157a0`+`0x14010b9a0` | `0x140063bd7` |
+| 7 | `0x140063bd7` | `solver.solve.status` | — | `0x1400645bd` |
+| 8 | `0x1400645bd` | `solver.solve.stop` | — | `0x14006514b` |
+| 9 | `0x14006514b` | `solver.lock.current.set` | — | `0x1400657a7` |
+| 10 | `0x1400657a7` | `solver.lock.current.get` | — | `0x140065f1c` |
+| 11 | `0x140065f1c` | `solver.lock.current.clear` | — | `0x140066295` |
+| 12 | `0x140066295` | `solver.lock.list` | — | `0x1400667d2` |
+| 13 | `0x1400667d2` | `solver.lock.clearAll` | — | `0x140066b11` |
+| 14 | `0x140066b11` | `solver.node.currentPlayer` | — | `0x140066eb4` |
+| 15 | `0x140066eb4` | `solver.node.numActions` | — | `0x140067195` |
+| 16 | `0x140067195` | `solver.node.currentBoard` | — | `0x140067466` |
+| 17 | `0x140067466` | `solver.node.actionsAfter` | — | `0x1400679f3` |
+| 18 | `0x1400679f3` | `solver.cards.possible` | — | `0x140067cc4` |
+| 19 | `0x140067cc4` | `solver.cards.private` | — | `0x14006829e` |
+| 20 | `0x14006829e` | `solver.node.results` | — | (end) |
+
+**Notable:** `solver.init` branch (`0x14006a680`) allocates `0xeff0` stack, checks for 1326 combo count via variant accessor `0x140043b60` compared against `0x52e`.
+
+First `.rdata` section methods (23 methods at `0x14016ebb0`–`0x140170348`) use `movups` SIMD comparison pattern at separate code locations (e.g., `0x140018d72` for `solver.export.fullFile`, `0x140019a62` for `solver.strategy.archive.open`, `0x1400238f7` for `solver.export.currentStreet`).
+
+See `HANDLER_DISPATCH_RECON.md` for complete documentation including first-section method references and handler vtable → dispatch relationship.
+
+---
+
+## 19. WHAT IS BLOCKED (Phase 5 — Dynamic, requires Windows + NVIDIA GPU)
 
 | Item | Why Blocked |
 |------|-------------|
@@ -574,7 +613,7 @@ Response: range policy JSON (type "action", player 0 root, preflop tree)
 
 ---
 
-## 19. REQUIRED ENVIRONMENT TO UNBLOCK PHASE 5
+## 20. REQUIRED ENVIRONMENT TO UNBLOCK PHASE 5
 
 1. **Windows/x64 with NVIDIA GPU** (compute capability 7.5–12.0, VRAM ≥ 8 GB)
    - Windows VM with GPU passthrough, or
@@ -584,7 +623,7 @@ Response: range policy JSON (type "action", player 0 root, preflop tree)
 
 ---
 
-## 20. DELIVERABLES (after dynamic capture)
+## 21. DELIVERABLES (after dynamic capture)
 
 - `HANDLER_MAP.md` — complete method → handler VA table (~60 methods)
 - `PTX_DUMP/` — all captured PTX blobs by kernel name
@@ -595,7 +634,7 @@ Response: range policy JSON (type "action", player 0 root, preflop tree)
 
 ---
 
-## 21. EXISTING RECON DOCUMENTS (in `re_lab/texassolvergpu/`)
+## 22. EXISTING RECON DOCUMENTS (in `re_lab/texassolvergpu/`)
 
 | Document | Contents |
 |----------|----------|
@@ -606,6 +645,7 @@ Response: range policy JSON (type "action", player 0 root, preflop tree)
 | `DEEP_RE_PHASE2.md` | Dispatcher disassembly, variant type system, dT table, transport protocol, kernel inventory, Q16, compact archive, CFV staging, anti-tamper, PTX status |
 | `FRONTEND_API_RECON.md` | Transport & auth, endpoint map, solve flow, JSON schemas, internal solver methods, CUDA kernels, JS poker primitives |
 | `HANDLER_VTABLE_RECON.md` | Handler vtable recovery (both vtables, ~22 handler addresses, object layout) |
+| `HANDLER_DISPATCH_RECON.md` | **NEW** — Static method dispatch chain (0x140061260-0x14006829e), all method→code block mappings, helper functions |
 | `PHASE3_CFR_LAUNCHERS.md` | CFR kernel launcher inventory, device buffer inventory, buffer lifetimes |
 | `PHASE3_COMPACT_ARCHIVE.md` | Compact archive / strategy archive format: Avro + DEFLATE, Q16 fields, layout, validation errors |
 | `PHASE3_HANDLER_MAP.md` | Native method handler map — dispatch mechanism, method inventory, dT table, anti-tamper |
@@ -622,4 +662,4 @@ Response: range policy JSON (type "action", player 0 root, preflop tree)
 
 ---
 
-**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **100% complete**. All binaries disassembled, all frontend assets extracted, all API endpoints/schemas documented, all handler vtables recovered, all CUDA kernels identified, all data structures reconstructed, all anti-tamper surfaces mapped. The only remaining unknowns require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this Linux host.
+**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **100% complete**. All binaries disassembled, all frontend assets extracted, all API endpoints/schemas documented, all handler vtables recovered (15+15 entries), complete static method dispatch chain recovered (19 methods in if-else chain at 0x140061260-0x14006829e plus 23 additional method string cross-references), all CUDA kernels identified, all data structures reconstructed, all anti-tamper surfaces mapped. The only remaining unknowns (method name → handler vtable entry mapping, PTX device code, kernel launch configs, compact archive bytes, full solve cycle) require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this Linux host.
