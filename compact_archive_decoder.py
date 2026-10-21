@@ -169,7 +169,9 @@ def _parse_record(data, offset):
     reach_q16, offset = _read_avro_q16_array(data, offset, reach_len)
 
     # strategy_probs_q16: array of array of int16 (num_actions x num_combos)
-    strategy_q16, offset = _read_avro_q16_matrix(data, offset, num_actions, num_combos)
+    # Outer length prefix = num_rows, then per-row: length prefix + int16 values
+    strategy_nrows, offset = _read_avro_long(data, offset)
+    strategy_q16, offset = _read_avro_q16_matrix(data, offset, strategy_nrows, num_combos)
 
     # action_evs_q16: array of array of int16 or null
     evs_q16, offset = _read_avro_q16_matrix_nullable(data, offset, num_actions, num_combos)
@@ -290,29 +292,30 @@ def _read_avro_q16_array(data, offset, count):
 
 
 def _read_avro_q16_matrix(data, offset, rows, cols):
-    """Read a rows x cols matrix of Q16 values."""
+    """Read a rows x cols matrix of Q16 values. Each row is length-prefixed."""
     matrix = []
     for _ in range(rows):
-        row, offset = _read_avro_q16_array(data, offset, cols)
+        row_len, offset = _read_avro_long(data, offset)
+        row, offset = _read_avro_q16_array(data, offset, row_len)
         matrix.append(row)
     return matrix, offset
 
 
 def _read_avro_q16_matrix_nullable(data, offset, rows, cols):
     """Read a nullable Q16 matrix (null or rows x cols)."""
-    # null is encoded as 0-length, or a single byte 0 for null in Avro union
-    # In this format, null is likely indicated by offset not advancing or a marker
-    # We try to read: first byte indicates null (0) or present (1)
+    # Avro union: null (tag 0) or matrix (tag 1)
     if offset >= len(data):
         return None, offset
-    # Peek: if it's a null marker in the union
     tag = data[offset]
     if tag == 0:
         return None, offset + 1
-    # Otherwise read the matrix
+    # tag == 1: read outer length prefix, then the matrix
+    offset += 1
+    nrows, offset = _read_avro_long(data, offset)
     matrix = []
-    for _ in range(rows):
-        row, offset = _read_avro_q16_array(data, offset, cols)
+    for _ in range(nrows):
+        row_len, offset = _read_avro_long(data, offset)
+        row, offset = _read_avro_q16_array(data, offset, row_len)
         matrix.append(row)
     return matrix, offset
 

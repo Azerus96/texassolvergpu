@@ -49,6 +49,17 @@ All kernels receive parameters via constant-memory bank `c[0x0][N]`. Observed sl
 | `c[0x0][0x1d8]` | lookup table | evaluate_showdown |
 | `c[0x0][0x1e0]` | suit/rank table (byte) | evaluate_showdown |
 | `c[0x0][0x1e8]` | shared memory base | evaluate_showdown |
+| `c[0x0][0x1f0]` | pointer | backward_player_packed |
+| `c[0x0][0x1f4]` | pointer | backward_player_packed |
+| `c[0x0][0x1fc]` | numPlayers / bound | backward_player_packed |
+| `c[0x0][0x200]` | flags / mode | backward_player_packed |
+| `c[0x0][0x208]` | bound | evaluate_fold_showdown_prefix |
+| `c[0x0][0x210]` | pointer | evaluate_fold_showdown_prefix |
+| `c[0x0][0x214]` | numCombos / bound | evaluate_fold_showdown_prefix |
+| `c[0x0][0x240]` | pointer | train_opponent_fold_showdown_parent_packed |
+| `c[0x0][0x248]` | numRows / bound | train_opponent_fold_showdown_parent_packed |
+| `c[0x0][0x24c]` | row stride | train_opponent_fold_showdown_parent_packed |
+| `c[0x0][0x250]` | numThreads / bound | train_opponent_fold_showdown_parent_packed |
 | `c[0x2][0x00]` | epsilon threshold (FLT_MIN = 1.175494350822287508e-38) | evaluate_showdown, evaluate_fold |
 
 ---
@@ -102,8 +113,11 @@ All kernels receive parameters via constant-memory bank `c[0x0][N]`. Observed sl
 | `ATOMS.CAST.SPIN Rd,[a],Rc,Rv` | Atomic CAS spin lock | evaluate_showdown, evaluate_fold |
 | `S2R Rd,SR_TID.X` | threadIdx.x | all |
 | `S2R Rd,SR_CTAID.X` | blockIdx.x | all |
-| `R2UR Rd,Rs / UR2R Rd,URs` | GPR <-> uniform register move | forward_player, train_small_tree |
+| `R2UR Rd,Rs / UR2R Rd,URs` | GPR <-> uniform register move | forward_player, train_small_tree, backward_player_packed, train_opponent_fold_showdown_parent_packed |
 | `CS2R Rd,SRZ` | Read special register SRZ | backward_player, backward_opponent |
+| `HFMA2.MMA Rd,Ra,Rb,Rc,Rd` | Tensor core half-precision fused multiply-add matrix accumulate | train_opponent_fold_showdown_parent_packed |
+| `IMNMX Rd,Ra,Rb,PT` | Integer min/max (conditional select) | train_opponent_fold_showdown_parent_packed |
+| `BAR.SYNC.DEFER_BLOCKING 0x0` | Deferred block barrier | train_opponent_fold_showdown_parent_packed, train_small_tree_fp32_multi_iter |
 | `EXIT` | Thread exit | all |
 | `BRA addr` | Unconditional branch | all |
 | `CALL.REL.NOINC addr` | Relative call (leaf, returns via EXIT) | backward_player, train_small_tree |
@@ -365,8 +379,88 @@ Mirrors backward_player but for the opponent player. Key differences:
 
 ---
 
-## 9. SASS-to-Pseudocode Summary Table
+## 9. Kernel: backward_player_packed — Q16 Packed CFR Backward (SASS-Exact)
 
+**File:** `/tmp/opencode/sass_disasm/sm_80/backward_player_packed.txt` (~440 instructions, 32 bytes shared mem)
+
+### 9.1 High-Level Algorithm
+
+```
+INPUTS (packed Q16 format):
+  reach_q16[a]    — per-action reach (Q16 int16)
+  actionEVs_q16[a] — per-action EV (Q16 int16)
+  regrets_q16[a]   — cumulative regrets (Q16 int16)
+  strategy_q16[a]  — output strategy (Q16 int16)
+  flags/mode       — operation flags                 c[0x0][0x200]
+  numPlayers       — player count                    c[0x0][0x1fc]
+
+STEPS:
+  1. Bounds check: threadIdx.x vs numPlayers
+  2. Load packed Q16 values from constant memory
+  3. Dequantize Q16: value = raw * (1/32768) = raw * 3.0518509447574615479e-05
+  4. nodeEV = sum_a strategy[a] * actionEVs[a]  (FMUL.FTZ + FADD.FTZ)
+  5. regret[a] = reach[a] * (actionEVs[a] - nodeEV)
+  6. Regret matching: posRegret = max(0, regret); strategy = posRegret / sumPos
+  7. BAR.SYNC.DEFER_BLOCKING for block-wide sync
+  8. Write Q16-packed strategy to global memory
+```
+
+### 9.2 Key SASS Features
+
+- **Q16 dequantization:** Multiplies by `3.0518509447574615479e-05` (= 1/32768) via `FMUL.FTZ`
+- **R2UR/UR2R:** Register-to-uniform-register moves for constant-memory addressing
+- **BAR.SYNC.DEFER_BLOCKING:** Deferred blocking barrier (line 0570)
+- **Predicate gating:** P1-P3 gate per-action stores (up to 4 actions)
+- **Constant slots:** `c[0x0][0x1f0]`, `c[0x0][0x1f4]`, `c[0x0][0x1fc]`, `c[0x0][0x200]`
+
+---
+
+## 10. Kernel: train_opponent_fold_showdown_parent_packed — Opponent CFR Training with Tensor Cores
+
+**File:** `/tmp/opencode/sass_disasm/sm_80/train_opponent_fold_showdown_parent_packed.txt` (~500 instructions, 608 bytes shared mem)
+
+### 10.1 High-Level Algorithm
+
+```
+Opponent-side CFR training for fold/showdown parent nodes.
+Processes opponent's reach, regrets, and strategy across multiple streets.
+
+STEPS:
+  1. Bounds check: threadIdx.x vs numThreads (c[0x0][0x250])
+  2. Barrier sync: BSSY B0 / BSYNC B0
+  3. Load opponent data pointers from constant memory
+  4. HFMA2.MMA tensor core operations for matrix accumulation
+  5. IMNMX integer min/max for clamping
+  6. MUFU.RCP for reciprocal
+  7. BAR.SYNC.DEFER_BLOCKING for deferred block sync
+  8. Q24/Q22 fixed-point dequantization
+```
+
+### 10.2 Key SASS Features
+
+- **Tensor cores (HFMA2.MMA):** Half-precision fused multiply-add matrix multiply-accumulate — `HFMA2.MMA R18, -RZ, RZ, 0, 0` for matrix initialization and accumulation
+- **Fixed-point scales:** `5.9604644775390625e-08` (2^-24, Q24) and `2.384185791015625e-07` (2^-22, Q22) used for dequantization
+- **IMNMX:** Integer min/max for conditional clamping
+- **MUFU.RCP:** Reciprocal approximation for normalization
+- **BAR.SYNC.DEFER_BLOCKING:** Deferred blocking barrier
+- **Constant slots:** `c[0x0][0x240]`, `c[0x0][0x248]`, `c[0x0][0x24c]`, `c[0x0][0x250]`
+
+---
+
+## 11. Kernel: evaluate_fold_showdown_prefix — Fold/Showdown Prefix Evaluation
+
+**File:** `/tmp/opencode/sass_disasm/sm_80/evaluate_fold_showdown_prefix.txt` (~1100 instructions)
+
+### 11.1 Key SASS Features
+
+- **R2UR conversions:** Register-to-uniform-register moves for addressing
+- **Flag checking:** `ISETP.NE.AND P0, PT, R20, 0x80, PT` and `ISETP.NE.AND P0, PT, R20, 0x40, PT` — check flag bits 0x80 and 0x40
+- **Shared memory barriers:** `BSSY B0` for block synchronization
+- **Constant slots:** `c[0x0][0x208]`, `c[0x0][0x210]`, `c[0x0][0x214]`
+
+---
+
+## 12. SASS-to-Pseudocode Summary Table
 | Kernel | SASS File | Instructions | Core Algorithm |
 |--------|-----------|-------------|----------------|
 | `gather_cfv` | gather_cfv.txt | 41 | out[tid] = src_table[indices[tid]] |
@@ -379,17 +473,18 @@ Mirrors backward_player but for the opponent player. Key differences:
 | `evaluate_fold_3p` | evaluate_fold_3p.txt | ~200 | 3-way fold equity (SHFL reduction) |
 | `backward_player` | backward_player.txt | 673 | CFR regret matching (4-action, shared mem, MUFU.RCP) |
 | `backward_opponent` | backward_opponent.txt | 361 | Opponent backward regret |
-| `backward_player_packed` | backward_player_packed.txt | ~230 | Q16 packed backward |
+| `backward_player_packed` | backward_player_packed.txt | ~440 | Q16 packed backward, R2UR moves, BAR.SYNC.DEFER_BLOCKING |
 | `backward_player_packed_cached` | backward_player_packed_cached.txt | ~340 | Q16 packed backward + shared mem tiling |
 | `train_small_tree_fp32_multi_iter` | train_small_tree_fp32_multi_iter.txt | ~3400 | Multi-iteration CFR + discount EMA |
-| `train_fold_showdown_parent_packed` | — | ~460 | Main CFR training (packed Q16) |
+| `train_fold_showdown_parent_packed` | train_fold_showdown_parent_packed.txt | ~460 | Main CFR training (packed Q16) |
+| `train_opponent_fold_showdown_parent_packed` | train_opponent_fold_showdown_parent_packed.txt | ~500 | Opponent CFR training, **tensor core HFMA2.MMA**, Q24/Q22 scales |
 | `apply_isomorphism` | apply_isomorphism.txt | ~30 | Tree isomorphism compaction |
 | `trim` | trim.txt | ~10 | Tree trimming (tombstone inactive) |
 | `replace` | replace.txt | ~20 | Node replacement |
 
 ---
 
-## 10. Numerical Constants Observed in SASS
+## 13. Numerical Constants Observed in SASS
 
 | Constant | Value | Context |
 |----------|-------|---------|
@@ -403,12 +498,15 @@ Mirrors backward_player but for the opponent player. Key differences:
 | `15` | eval5 base | Base-15 packed hand rank |
 | `21` | eval7 subsets | C(7,5) five-card subsets |
 | `1326` | NUM_COMBOS | C(52,2) starting hands |
+| `3.0518509447574615479e-05` | 1/32768 | Q16 dequantization scale (backward_player_packed) |
+| `5.9604644775390625e-08` | 2^-24 = 1/16777216 | Q24 fixed-point scale (train_opponent_fold_showdown_parent_packed) |
+| `2.384185791015625e-07` | 2^-22 = 1/4194304 | Q22 fixed-point scale (train_opponent_fold_showdown_parent_packed) |
 | `65536.0` | Q16_SCALE | Q16 fixed-point scale |
 | `-32768` | Q16_MIN | Q16 invalid sentinel |
 
 ---
 
-## 11. Correspondence: SASS ↔ Embedded JS Poker Primitives
+## 14. Correspondence: SASS ↔ Embedded JS Poker Primitives
 
 | JS Primitive | SASS Kernel | SASS Pattern |
 |-------------|-------------|--------------|
@@ -422,7 +520,7 @@ Mirrors backward_player but for the opponent player. Key differences:
 
 ---
 
-## 12. Deliverable Status
+## 15. Deliverable Status
 
 | Item | Status | Location |
 |------|--------|----------|
@@ -434,6 +532,9 @@ Mirrors backward_player but for the opponent player. Key differences:
 | train_small_tree algorithm | Complete (SASS-exact) | This document (§6), cfr_simulator.py |
 | gather_cfv algorithm | Complete | This document (§7), cfr_simulator.py |
 | backward_opponent algorithm | Complete | This document (§8) |
+| backward_player_packed algorithm | Complete (SASS-exact) | This document (§9) |
+| train_opponent_fold_showdown_parent_packed algorithm | Complete (SASS-exact, tensor cores) | This document (§10) |
+| evaluate_fold_showdown_prefix algorithm | Complete (SASS-exact) | This document (§11) |
 | Full kernel pseudocode | Complete | CUDA_KERNELS_RECON.cpp |
 | Remaining: kernel launch configs | Blocked (dynamic) | Requires cuLaunchKernel hooking |
 | Remaining: PTX device code | Blocked (dynamic) | Requires cuModuleLoadData hooking |
