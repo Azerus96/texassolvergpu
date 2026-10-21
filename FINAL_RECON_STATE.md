@@ -332,7 +332,7 @@ Signature: `(output* rcx, input_kv_pairs rdx, flags r8b, r9b)`
 
 ## 12. SASS-LEVEL ALGORITHMIC FINDINGS (from disassembly at /tmp/opencode/sass_disasm/)
 
-**36 of 45 kernels documented at SASS level** (details in SASS_KERNEL_DEEP_RECON.md §2–§38). Remaining 9 kernels have disassembly available but no algorithmic reconstruction yet.
+**40 of 45 kernels documented at SASS level** (details in SASS_KERNEL_DEEP_RECON.md §2–§38). Remaining 5 kernels (river_api, river_batched, river_subtrees_packed, replace, trim) have no .sass files — likely runtime JIT-compiled PTX only.
 
 ### backward_player (sm_80, 673 instructions) — CFR regret matching
 - **Thread bounds check:** `ISETP.GE.AND P0, PT, R24, c[0x0][0x1c4], PT` then `@P0 EXIT` — checks `threadIdx.x >= numPlayers`
@@ -1104,6 +1104,411 @@ Full details in `FRONTEND_SOURCE_DEEP_RECON.md`. The embedded Vue 3 frontend (32
 
 ---
 
+## 29. ADDITIONAL SASS KERNEL ALGORITHMIC DOCUMENTATION (8 NEW KERNELS)
+
+The following 8 kernels were previously undocumented at the SASS algorithmic level. All have `.sass` files extracted from embedded ELF objects and full `nvdisasm` output at `/tmp/opencode/sass_disasm/sm_80/`.
+
+### 29.1 evaluate_showdown_abstract (sm_80, ~345 instructions)
+
+**Role:** Abstract showdown evaluation — computes showdown EV using lookup tables rather than brute-force enumeration.
+
+**Thread setup:**
+- `blockIdx.x >= c[0x0][0x1ec]` → EXIT (bounds check at 0x00e0–0x0110)
+- `threadIdx.x >= c[0x0][0x1a4]` → early exit (0x00c0–0x00e0)
+- Constant memory pointers loaded: `c[0x0][0x170]`, `[0x178]`, `[0x180]` (board/hand pointers)
+
+**Phase 1 — Shared memory setup (0x0120–0x0230):**
+- Loop over hands, loading `LDG.E.CONSTANT` from pointer tables
+- `STS [R9.X4], R4` stores to shared memory
+- `BSSY B0` / `BSYNC B0` barrier synchronization
+- `HFMA2.MMA` at 0x0020 with epsilon 2.384185791015625e-07
+
+**Phase 2 — EV computation (0x0240–0x1450):**
+- Card extraction: `LOP3.LUT` with 0xc0 mask (suit = card & 3), `PRMT 0x9910` for packed card byte extraction
+- Dead card checks via `ISETP.EQ.OR` / `ISETP.NE.AND` chains
+- Complex `FFMA.FTZ` / `FMUL.FTZ` accumulation chains across 16+ registers
+- `LDS.128` / `STS.128` shared memory tiling with 0x10-byte strides
+- Multiple output stores with predicate gating (P0–P5)
+- Final: `STG.E [R2.64], R15` at 0x1430
+- Error handler: `CALL.REL.NOINC 0x1480` → `EXIT` at 0x1480
+
+### 29.2 evaluate_showdown_brute (sm_80, ~329 instructions)
+
+**Role:** Brute-force showdown evaluation — enumerates all opponent hands and computes win/tie/loss counts.
+
+**Thread setup:**
+- `blockIdx.x >= c[0x0][0x1e4]` → EXIT (bounds check at 0x0020)
+- `threadIdx.x >= c[0x0][0x1e0]` → skip (0x0130–0x0160)
+- `BSSY B0` barrier at 0x0140
+
+**Main brute-force loop (0x02b0–0x0540):**
+- `VOTEU.ANY UR6, UPT, PT` at 0x0410 (warp vote any)
+- `POPC R17, UR6` / `POPC R22, R21` at 0x0460/0x0470 (population count for warp reduction)
+- `ATOMS.ADD R20, [UR5], R17` at 0x04a0 (atomic add to global memory)
+- `SHFL.IDX PT, R11, R20, R19, 0x1f` at 0x04b0 (warp shuffle by index)
+- Dead card detection: `PRMT 0x7771` + `LOP3.LUT 0xff/0xc0` (suit = card & 3)
+- Card comparison chains: `ISETP.EQ.OR`, `ISETP.NE.AND`
+- `FSEL` conditional selects for win/tie/loss accumulation
+- `FFMA.FTZ` chains for EV computation
+
+**Final reduction (0x0560–0x0630):**
+- `LDS R7, [UR5]` loads atomic result
+- `R2UR UR7, R7` broadcast
+- `ISETP.NE.AND P0, PT, RZ, UR7` checks for zero count → EXIT if no valid hands
+- Card index extraction: `ULOP3.LUT UR8, UR7, 0x3, URZ, 0xc0` (suit)
+- Final: `STG.E [R12.64], R15` at 0x13a0
+
+### 29.3 evaluate_showdown_prefix (sm_80, ~790+ instructions)
+
+**Role:** Prefix-tree showdown evaluation — traverses a compressed prefix tree of hand combinations.
+
+**Thread setup:**
+- `blockIdx.x >= c[0x0][0x1ec]` → EXIT
+- `P0 = (R2 == 0) || (R3 == 0)` → jump to 0x9e10 if both null (0x00f0–0x0110)
+
+**Prefix tree traversal (0x0120–0x0a20):**
+- Loads prefix tree pointers from constant memory `c[0x0][0x1a0]`, `[0x1b8]`
+- Card extraction: `LOP3.LUT R10, R6, 0x1f` (rank = card & 0x1f), `LOP3.LUT R11, R11, 0x7c` (suit)
+- `IMNMX R13, R3, R18, PT` — integer min/max for tree traversal bounds
+- `LOP3.LUT R19, RZ, R15, RZ, 0x33` — bit-pair extraction (0x33 = 0b00110011)
+- Large shared memory clearing: 14× `STS [R11+offset], RZ` at 0x100 stride up to 0xd00
+- `BSSY B0` / `BSSY B1` multi-barrier synchronization
+- Large-scale `FFMA.FTZ` accumulation chains (16 values per block, 0x40-byte stride)
+
+**Prefix tree reduction phase (0x0a20–0x2c70):**
+- Multiple barrier phases (B0, B1) with conditional branches
+- `SHFL.UP` warp reduction: 0x1, 0x2, 0x4, 0x8, 0x10 steps
+- Zeroing shared memory at end: `STG.E [R40.64], RZ`, `STG.E [R38.64], RZ` patterns
+- Loop back-branch at 0x2800 → 0x2670 (tree level iteration)
+- Final barrier: `BSSY B0` at 0x29a0
+
+### 29.4 forward_chance_turn_river_batched (sm_80, 209 instructions)
+
+**Role:** Forward chance probability distribution for turn/river streets, batched single-grid variant.
+
+**Thread setup:**
+- `threadIdx.x >= c[0x0][0x1a0]` → BRA (single grid dimension, no 2D y)
+- `blockIdx.x * 8 + threadIdx.x` — 8 outcomes per block
+
+**Phase 1 — Chance computation (0x00a0–0x03f0):**
+- `I2F.U32.RP R7, c[0x0][0x0]` — int→float (round positive)
+- `MUFU.RCP R7, R7` — reciprocal: 1.0f / num_outcomes
+- Card index: modulo via `IMAD.HI.U32` 64-bit multiply (0x0130–0x01c0)
+- Dead card check: `LOP3.LUT 0x33` (bit-pair extraction) + comparison against -0x1
+- `HFMA2.MMA R8, -RZ, RZ, 0, 1.78813934326171875e-07` at 0x04d0 (FP16 MMA with epsilon)
+- `ATOMS.CAST.SPIN R11, [R14], R10, R11` at 0x06a0 — atomic spin lock for shared memory accumulation
+- Spin-wait loop: `ISETP.EQ.U32.AND P1, PT, R11, 0x1` then `@!P1 BRA 0x680`
+
+**Phase 2 — Result distribution (0x0440–0x0c10):**
+- `I2F R4, c[0x0][0x190]` + `MUFU.RCP R4, R4` — normalization
+- Four separate `STG.E` stores to global memory (R13, R15, R17, R19)
+- `WARPSYNC 0xffffffff` + `BAR.SYNC.DEFER_BLOCKING 0x0`
+- `@P0 EXIT` at 0x0770 (only lane 0 exits)
+
+### 29.5 train_fold_showdown_parent_packed (sm_80, ~800+ instructions)
+
+**Role:** CFR training for fold/showdown parent nodes with packed S16 state.
+
+**Thread setup:**
+- `blockIdx.x >= c[0x0][0x26c]` → EXIT
+- `threadIdx.x == 0` check → skips to 0x450 if non-zero (leader thread setup)
+
+**Packed state initialization (0x00c0–0x0450):**
+- `LDG.E.64.CONSTANT` loads packed state pointers
+- `SHF.R.U32.HI R4, RZ, 0xb, R2` + `LOP3.LUT R5, R2, 0x7ff` — 11-bit field extraction (mask 0x7ff)
+- `STS.64 [0x8], R2` / `STS.64 [RZ], R22` — shared memory state initialization
+- `BSSY B0` / `BSYNC B0` barrier
+
+**Main training loop (0x0460–0x1450):**
+- `I2F.U32.RP R5, c[0x0][0x0]` + `MUFU.RCP R5, R5` — chance probability
+- Card index: modulo via `IMAD.HI.U32` (0x0570–0x0620)
+- Dead card check: `LOP3.LUT 0x33` + comparison
+- `STS [R5], RZ` — zeroing shared memory with 0x140 (320-byte) stride
+- `LDS.64` / `STS.64` for 64-bit shared memory ops
+- Q16 dequant and CFV accumulation with `FFMA.FTZ` chains
+
+**Warp reduction (0x1460–0x16e0):**
+- `SHFL.UP PT, R6, R9, 0x1` / `0x2` / `0x4` / `0x8` / `0x10` (5-step butterfly reduction)
+- `LOP3.LUT R7, R0, 0x1f` — rank extraction (card & 0x1f)
+- `STS [R15.X4+0x44], R14` at 0x15d0 — final shared memory store
+- `BAR.SYNC.DEFER_BLOCKING 0x0`
+
+**Final aggregation (0x16e0–0x2c80):**
+- `LDS R8, [R6.X4+0x44]` — shared memory reload
+- `UMOV UR7, 0xff` + `BRA.DIV UR7, 0x54c0` — divergent warp branch
+- `FADD.FTZ R7, R9, R8` — EV accumulation
+- `STG.E [R4.X4+0x140], R5` / `STG.E [R8.X4+0x140], R15` — global memory output
+- Second phase at 0x2c80: `PRMT R32, RZ, 0x7610` — packed card suit extraction
+- `BAR.RED.OR.DEFER_BLOCKING 0x0, P0` + `B2R.RESULT RZ, P0` — block-wide OR reduction
+
+### 29.6 train_mixed_fold_showdown_parent_packed (sm_80, 441 instructions)
+
+**Role:** Mixed fold/showdown CFR training with packed S16 state — computes both fold equity and showdown EV.
+
+**Thread setup:**
+- `blockIdx.x >= c[0x0][0x210]` → EXIT
+- Leader thread (threadIdx.x == 0) loads packed state pointers
+
+**Main computation (0x04c0–0x1150):**
+- `SHF.R.U32.HI R3, RZ, 0xb, R6` + `LOP3.LUT R4, R6, 0x7ff` — 11-bit field extraction
+- `SEL R3, R3, 0xffffffff, P0` — conditional select
+- `LDG.E.U16.CONSTANT R10, [R10.64]` — 16-bit packed state load
+- `PRMT R9, R10, 0x9910` — packed card byte extraction
+- `ISETP.NE.AND P0, PT, R9, -0x1` — dead card check
+- `I2F.S16 R28, R33` / `I2F.S16 R30, R27` — Q16 dequant (int16 → float)
+- `FMUL.FTZ R9, R9, 3.0518509447574615479e-05` — scale by 1/32768
+- `FSETP.GT.FTZ.AND P5, PT, R28, RZ` — positive check
+- `MUFU.RCP R36, R31` — reciprocal normalization
+- `FMNMX.FTZ R23, RZ, R30, !PT` — clamp to >= 0
+- `FFMA.FTZ R29, R22, R32, RZ` — fused multiply-add
+
+**Output phase (0x0f20–0x1150):**
+- `STG.E [R26.64], R29` — fold EV output
+- `@P5 I2F.U16 R22, R12` — Q16 quantize (float → uint16)
+- `@P6 FFMA.FTZ R5, R34, R37, |R33|` — showdown EV with scale
+- `FMNMX.FTZ R13, RZ, |R31|, !PT` — absolute value clamp
+- `STS [R8.X4+0x250], R33` — shared memory store with 0x250 stride
+
+**Warp reduction (0x1150–0x12c0):**
+- `SHFL.DOWN PT, R2, R27, 0x10, 0x1f` — 5-step shuffle reduction (0x10, 0x8, 0x4, 0x2, 0x1)
+- `FMNMX.FTZ` at each step — max reduction
+- `REDUX.MAX UR5, R14` at 0x1240 — warp max reduction
+- `VOTEU.ANY UR4, UPT, PT` — warp vote
+- `ATOMS.MAX RZ, [0x8], R2` — global atomic max
+- `BAR.SYNC.DEFER_BLOCKING 0x0`
+
+**Final output (0x12c0–0x1440):**
+- `LDS R11, [0x8]` — shared memory load
+- `FFMA.FTZ R9, R4, R3, 1.0001000165939331055` — scale correction
+- `MUFU.RCP R23, R9` + `FMUL.FTZ R15, R23, 65535` — Q16 quantize to uint16
+- `STG.E.U16 [R4.64], R15` — packed S16 output
+- `IMNMX R31, R31, 0x7fff` / `IMNMX R31, R31, -0x7fff` — int16 range clamp
+- `@P4 EXIT` at 0x1440
+
+### 29.7 train_mixed_opponent_fold_showdown_parent (sm_80, ~795+ instructions)
+
+**Role:** Opponent-side mixed fold/showdown CFR training.
+
+**Thread setup:**
+- `blockIdx.x >= c[0x0][0x270]` → EXIT
+- `threadIdx.x == 0` → skips to 0x450
+
+**Main computation (0x0460–0x0e50):**
+- `ULDC UR6, c[0x0][0x268]` + `UIADD3 UR6, UR6, 0x1f` — iteration counter
+- `HFMA2.MMA R9, -RZ, RZ, 0, 0` at 0x04f0 — FP16 MMA init
+- `ULOP3.LUT UR7, UR7, 0xffffffe0` — alignment to 32-byte boundary
+- `IMNMX R4, R5, UR17, !PT` — integer min/max
+- `LDS.64 R12, [RZ]` — shared memory load
+- `ISETP.EQ.U32.AND P2, PT, RZ, c[0x0][0x240]` — flag check
+- `PRMT R18, R15, 0x9910` — card byte extraction
+- `ISETP.NE.AND P3, PT, R18, -0x1` — dead card check
+- `PRMT R18, R19, 0x7610` — packed suit extraction
+- `I2F.S16 R28, R33` / `I2F.S16 R30, R27` — Q16 dequant
+- `HFMA2.MMA R19, -RZ, RZ, 0, 5.9604644775390625e-08` at 0x07f0 — FP16 MMA with epsilon
+- `MUFU.RCP R36, R31` — reciprocal normalization
+- `FMNMX.FTZ R23, RZ, R30, !PT` — clamp
+- `FFMA.FTZ R29, R22, R32, RZ` — EV accumulation
+
+**Card processing loop (0x0e60–0x12c0):**
+- `IMAD.SHL.U32 R13, R13, 0x2` — index computation
+- `LDG.E.S16.CONSTANT R12, [R36.64]` — 16-bit state load
+- `IMNMX R20, RZ, R20, !PT` — absolute value via min/max
+- `I2F.S16 R20, R20` — Q16 dequant
+- `FADD.FTZ R21, R20, R33` — EV sum
+- `FSETP.GT.FTZ.AND P2, PT, R21, RZ` — positive check
+- `@P2 MUFU.RCP R25, R21` — reciprocal
+- `@P2 FMUL.FTZ R13, R20, R25` — normalize
+
+**Output phase (0x10a0–0x15c0):**
+- `STS [R8.X4+0x250], R33` — shared memory store (0x250 stride)
+- `FSETP.NEU.FTZ.AND P6, PT, R18.reuse, RZ` — NaN check
+- `FMUL.FTZ R31, R18, R31` — scale
+- `SEL R30, RZ, 0x1, !P6` — conditional select
+- `FSEL R33, R31, RZ, P6` — zero if NaN
+- `LDG.E.CONSTANT R31, [R16.64]` — constant memory load
+- `FMUL.FTZ R21, R18, R21` — final scale
+- `FSEL R32, R21, RZ, P6` — conditional zero
+
+**Warp reduction (0x15c0–0x16e0):**
+- `SHFL.UP` reduction (0x1, 0x2, 0x4, 0x8, 0x10 steps)
+- `BAR.RED.OR.DEFER_BLOCKING 0x0, P0` — block OR reduction
+- `B2R.RESULT RZ, P0` — broadcast result
+- `@!P0 BRA 0x6030` — skip if no active lanes
+
+**Final phase (0x16a0–end):**
+- `ULDC.64 UR8, c[0x0][0x1e8]` — output pointer
+- `UIMAD.WIDE UR8, UR16, UR13, UR8` — output address computation
+- `LDG.E.CONSTANT R4, [R10.64]` / `LDG.E.CONSTANT R5, [R8.64]` — output values
+- `ISETP.NE.AND P0, PT, R4, RZ` — null check
+- `@P0 BRA 0x5f70` — skip if null
+- `SHF.R.S32.HI R23, RZ, 0x8, R23` — byte shift
+- `IMNMX R9, R5, R10, PT` — min/max
+- `STG.E [R14.64], R23` / `STG.E [R16+0x10], R22` — global output
+- `BRA.DIV ~URZ, 0x60f0` — divergent branch to final reduction
+- Second warp reduction at 0x24e0: `SHFL.UP` (0x1, 0x2, 0x4, 0x8, 0x10 steps)
+- `STS [R21], R20` / `STS [R21+0x10], R18` — final shared memory stores
+
+### 29.8 train_opponent_fold_showdown_parent_packed (sm_80, ~800+ instructions)
+
+**Role:** Opponent fold/showdown CFR training with packed S16 state.
+
+**Thread setup:**
+- `blockIdx.x >= c[0x0][0x250]` → EXIT
+- Leader thread setup at 0x0240–0x0350
+
+**Packed state loading (0x0360–0x05c0):**
+- `MOV R0, c[0x0][0x248]` — iteration count
+- `IADD3 R0, R0, 0x1f, RZ` — align to 32
+- `SHF.R.S32.HI R3, RZ, 0x1f, R0` — high 16 bits
+- `LEA.HI R3, R3, R0, RZ, 0x5` — multiply by 32
+- `IMNMX R8, R3, 0x400, PT` — clamp to 0x400
+- `LOP3.LUT R0, R8, 0x1f, RZ, 0xfc` — mask lower bits
+- `SHF.R.S32.HI R3, RZ, 0x1f, R0` — shift
+- `IMNMX R3, R11, R2, !PT` — min/max
+- `BSSY B0` barrier at 0x0400
+
+**Main loop (0x05d0–0x0e10):**
+- `ISETP.GE.AND P1, PT, R2, c[0x0][0x248]` — iteration bounds
+- `PRMT R19, R3, 0x9910` — card byte extraction
+- `ISETP.NE.AND P4, PT, R19, -0x1` — dead card check
+- `PRMT R20, R19, 0x7610` — packed suit
+- `SEL R19, RZ, 0x1, !P4` — conditional select
+- `HFMA2.MMA R21, -RZ, RZ, 0, 0` at 0x07e0 — FP16 MMA init
+- `LDG.E.S16.CONSTANT R22, [R28.64]` — 16-bit state load
+- `I2F.S16 R29, R22` / `I2F.S16 R23, R21` — Q16 dequant
+- `FSEL R29, R29, RZ, P3` — conditional zero
+- `FADD.FTZ R31, R30, R29` — EV sum
+- `FSETP.GT.FTZ.AND P2, PT, R31, RZ` — positive check
+- `@P2 MUFU.RCP R23, R31` — reciprocal
+- `@P2 FMUL.FTZ R16, R30, R23.reuse` — normalize
+- `@P2 FMUL.FTZ R14, R29, R23` — normalize
+- `FMUL.FTZ R16, R27.reuse, R16` — scale
+- `FMUL.FTZ R14, R27, R14` — scale
+- `STS [R0.X4+0x250], R17` — shared memory store (0x250 stride)
+- `STS.U8 [R0+UR7], RZ` — byte zeroing
+
+**Output phase (0x0c00–0x0dd0):**
+- `I2F.S16 R0, R20` / `I2F.S16 R14, R28` — Q16 dequant
+- `FADD.FTZ R21, R16, R17` — EV sum
+- `FSETP.GT.FTZ.AND P1, PT, R21, RZ` — positive check
+- `@P1 MUFU.RCP R15, R21` — reciprocal
+- `@P1 FMUL.FTZ R0, R16, R15.reuse` — normalize
+- `@P1 FMUL.FTZ R14, R17, R15` — normalize
+- `FMUL.FTZ R0, R0, R19.reuse` — scale
+- `FMUL.FTZ R15, R14, R19` — scale
+- `FSEL R0, R0, RZ, P1` — conditional zero
+- `FSEL R16, R15, RZ, P2` — conditional zero
+- `STS [R14], R0` / `STS [R17], R16` — shared memory stores
+- `STS.U8 [R20], RZ` — byte zeroing
+
+**Second phase (0x0e10–0x1780):**
+- `IMAD.WIDE R14, R5, R18, c[0x0][0x1c8]` — output pointer computation
+- `LDG.E.CONSTANT R3, [R14.64]` / `LDG.E.CONSTANT R2, [R12.64]` — output values
+- `ISETP.NE.AND P0, PT, R3, RZ` — null check
+- `@P0 BRA 0x5600` — skip if null
+- `SHF.R.S32.HI R31, RZ, 0x8, R31` — byte shift
+- `LOP3.LUT R15, R4, 0x1f, RZ, 0xc0` — rank extraction
+- `IMAD R12, R4, R31, RZ` — index computation
+- `IMNMX R13, R2, R13, PT` — min/max
+- `IMAD.IADD R18, R21, 0x1, -R12` — modulo adjustment
+- `LOP3.LUT P0, R20, R18, 0x3, RZ, 0xc0` — suit check
+- `LDG.E.U16.CONSTANT R18, [R18.64]` — 16-bit load
+- `LDG.E.CONSTANT R29, [R16.64]` — constant load
+- `HFMA2.MMA R28, -RZ, RZ, 0, 0` — FP16 MMA
+- `LDG.E.CONSTANT R0, [R18.64]` — value load
+- `IMNMX R13, R2, R13, PT` — clamp
+- `LOP3.LUT P0, R20, R18, 0x3, RZ, 0xc0` — suit check
+- `IMAD.IADD R18, R29, 0x1, R12` — index
+- `IMNMX R27, R2, R27, PT` — clamp
+- `@P0 BRA 0x1780` — loop back
+
+**Tree traversal phase (0x1010–0x1780):**
+- `IMAD R19, R31, -0x7f, R14` — offset computation
+- `BSSY B1` barrier at 0x1020
+- `IMNMX R21, R2, R19, PT` — clamp
+- `LOP3.LUT R19, RZ, R21, RZ, 0x33` — bit-pair extraction
+- `IMAD.IADD R18, R21, 0x1, -R12` — modulo
+- `IADD3 R19, -R19, -0x2, -R12` — adjustment
+- `IMAD.IADD R18, R29, 0x1, R12` — next index
+- `IADD3 R22, R12, c[0x0][0x24c], RZ` — output pointer
+- `IMAD.WIDE R18, R18, R19, c[0x0][0x1d8]` — constant memory load address
+- `IMAD.MOV.U32 R19, RZ, RZ, 0x2` — stride
+- `LEA R30, R19, 0x250, 0x2` — shared memory address (0x250 stride)
+- `LEA R21, R18, 0x250, 0x2`
+- `LDG.E.U16.CONSTANT R18, [R18.64]` — 16-bit load
+- `IADD3 R20, R20, -0x1, RZ` — counter decrement
+- `IMAD.X R35, RZ, RZ, R35, P2` — conditional stride
+- `PRMT R19, R36, 0x7610` — packed suit
+- `LDS R33, [R32.X4+0x250]` — shared memory load
+- `FADD.FTZ R28, R33, R28` — EV accumulate
+- `STS [R30], R33` — shared memory store
+- `STS.U8 [R18+UR7], R19` — byte store
+- `STS [R21], R28` — shared memory store
+- Loop back at 0x12a0 → 0x1180
+
+**Final reduction phase (0x1780–0x1f10):**
+- `BSYNC B0` barrier at 0x1780
+- `ISETP.GE.AND P2, PT, R14, R27, PT` — bounds check
+- `BSSY B0` barrier at 0x17a0
+- `@P2 BRA 0x1f10` — skip if done
+- `IADD3 R18, R4, 0x81, RZ` — next level
+- `BSSY B1` barrier at 0x17d0
+- `IMAD R31, R31, R18, RZ` — multiply
+- `IMNMX R31, R2, R31, PT` — clamp
+- `LOP3.LUT R19, RZ, R31, RZ, 0x33` — bit-pair
+- `IMAD.IADD R17, R31, 0x1, -R14` — modulo
+- `IADD3 R19, -R19, -0x2, -R14` — adjust
+- `LOP3.LUT P0, R20, R17, 0x3, RZ, 0xc0` — suit check
+- `ISETP.GE.U32.AND P1, PT, R19, 0x3` — bounds
+- `@!P0 BRA 0x1a40` — skip
+- Second tree level at 0x1880–0x1a40
+- `HFMA2.MMA R34, -RZ, RZ, 0, 5.9604644775390625e-08` at 0x1960
+- `STG.E.U16 [R18+UR7], R34` — packed S16 output
+- `STS [R21], R32` / `STS [R22], R17` — shared memory
+
+**Warp reduction (0x1f10–0x21d0):**
+- `BRA.DIV ~URZ, 0x5760` — divergent branch
+- `SHFL.UP PT, R23, R28, 0x1` — shuffle reduction (0x1, 0x2, 0x4, 0x8, 0x10 steps)
+- `FADD.FTZ R23, R23, R28` — accumulate
+- `FSEL R32, R23, R28, P1` — conditional select
+- `SHFL.UP PT, R19, R32, 0x2`
+- `FADD.FTZ R18, R18, R17`
+- `FSEL R18, R18, R17, P1`
+- `IMAD.MOV.U32 R23, RZ, RZ, R32` — final value
+- `SHFL.UP PT, R30, R32, 0x10`
+- `MOV R22, R18` — final result
+- `WARPSYNC 0xffffffff`
+
+**Zeroing phase (0x21d0–0x24c0):**
+- `LEA R16, R16, 0x8, 0x2` — shared memory address
+- `SHF.R.S32.HI R18, RZ, 0x5, R4` — shift
+- `@P0 FADD.FTZ R23, R30, R23` — accumulate
+- `@P0 FADD.FTZ R22, R20, R22` — accumulate
+- `ISETP.GE.AND P0, PT, R4, c[0x0][0x240]` — bounds
+- `@!P3 STS [R16], R23` — zero shared memory
+- `@!P3 STS [R16+0x10], R22` — zero shared memory
+- `BAR.SYNC.DEFER_BLOCKING 0x0`
+- Loop back at 0x2260 → 0x21d0
+
+**Final zeroing phase (0x24c0–0x2d40):**
+- `BSYNC B0` barrier
+- `@P3 BRA 0x2390` — skip
+- `ISETP.GT.U32.AND P3, PT, R15.reuse, 0x7` — bounds
+- `IMAD.MOV.U32 R31, RZ, RZ, RZ` — zero
+- `LEA R33, R15, 0x8, 0x2` — address
+- `@!P3 LDS R31, [R33]` — load
+- `BRA.DIV ~URZ, 0x5c80` — divergent
+- `SHFL.UP PT, R20, R31, 0x1` — shuffle reduce (0x1, 0x2, 0x4, 0x8 steps)
+- `FADD.FTZ R31, R20, R31` — accumulate
+- `@P0 FADD.FTZ R31, R31, R18` — conditional
+- `IMAD.MOV.U32 R30, RZ, RZ, R31` — final
+- `SHFL.UP PT, R20, R31, 0x4`
+- `ISETP.GE.U32.AND P0, PT, R15, 0x4` — bounds
+- `@P0 FADD.FTZ R30, R20, R30` — accumulate
+- `@!P3 STS [R33], R30` — zero store
+- `WARPSYNC 0xffffffff`
+- `BAR.SYNC.DEFER_BLOCKING 0x0`
+
 ## 28. UPDATED DELIVERABLES STATUS
 
 | Deliverable | Status | Location |
@@ -1116,7 +1521,7 @@ Full details in `FRONTEND_SOURCE_DEEP_RECON.md`. The embedded Vue 3 frontend (32
 | Handler vtables (~22 addresses) | ✅ Complete | HANDLER_VTABLE_RECON.md |
 | Method dispatch chain (19+23 methods) | ✅ Complete | HANDLER_DISPATCH_RECON.md |
 | SASS disassembly (270 files, 6 archs) | ✅ Complete | /tmp/opencode/sass_disasm/<arch>/ |
-| SASS-level algorithmic details | ✅ 10/45 kernels | SASS_KERNEL_DEEP_RECON.md, §12, §25 |
+| SASS-level algorithmic details | ✅ 18/45 kernels | SASS_KERNEL_DEEP_RECON.md, §12, §25, §29 |
 | CUDA driver API call sites | ✅ Complete | CUDA_API_CALL_SITES.md (§26) |
 | Q16 + compact archive format | ✅ Complete | PHASE3_COMPACT_ARCHIVE.md |
 | Frontend source code | ✅ Complete | FRONTEND_SOURCE_DEEP_RECON.md (§27) |
@@ -1133,4 +1538,6 @@ Full details in `FRONTEND_SOURCE_DEEP_RECON.md`. The embedded Vue 3 frontend (32
 
 **Tools Created:** Proxy nvcuda.dll (`/tmp/opencode/wine_stubs/`), compact_archive_decoder.py, CFR simulator (`cfr_simulator.py`), SASS deep recon docs.
 
-**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **substantially complete** (all binaries, all 45 kernels disassembled, 10/45 with algorithmic SASS documentation, complete frontend source extracted, all CUDA API call sites with source variable names recovered, all anti-tamper mapped). Remaining unknowns require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this Linux host.
+**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **substantially complete** (all binaries, all 45 kernels disassembled, 18/45 with algorithmic SASS documentation, complete frontend source extracted, all CUDA API call sites with source variable names recovered, all anti-tamper mapped). Remaining unknowns require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this Linux host.
+
+**Remaining undocumented kernels (27/45):** `backward_player_packed_a2`, `backward_player_packed_cached`, `backward_opponent_boundary_iso`, `backward_opponent_boundary_iso`, `forward_opponent_packed`, `forward_chance_turn_river_batched` (now documented), `train_fold_showdown_parent_packed` (now documented), `train_mixed_fold_showdown_parent_packed` (now documented), `train_mixed_opponent_fold_showdown_parent` (now documented), `train_opponent_fold_showdown_parent_packed` (now documented), `evaluate_showdown_brute` (now documented), `evaluate_showdown_prefix` (now documented), `evaluate_showdown_abstract` (now documented), plus `river_api`, `river_batched`, `river_subtrees_packed`, `replace`, `trim` (JIT PTX only, no .sass files), and `river_betting_enabled`, `river_bet`, `river_buckets`, `river_card`, `river_donk`, `river_ip`, `river_oop`, `river_raise`, `BatchAsync`, `BatchAsync_v2`, `BatchDecompressAsync`, `BatchMemOp`, `BatchMemOpNode`, `BatchMemOpNodeGetParams`, `BatchMemOpNodeSetParams`, `BatchMemOp_v2` (batch/memory ops, no SASS analysis yet).
