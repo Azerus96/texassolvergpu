@@ -164,8 +164,9 @@ def _parse_record(data, offset):
     # pot: int
     pot, offset = _read_avro_int(data, offset)
 
-    # reach_probs_q16: array of int16 (num_combos)
-    reach_q16, offset = _read_avro_q16_array(data, offset, num_combos)
+    # reach_probs_q16: array of int16 (num_combos) — length-prefixed Avro array
+    reach_len, offset = _read_avro_long(data, offset)
+    reach_q16, offset = _read_avro_q16_array(data, offset, reach_len)
 
     # strategy_probs_q16: array of array of int16 (num_actions x num_combos)
     strategy_q16, offset = _read_avro_q16_matrix(data, offset, num_actions, num_combos)
