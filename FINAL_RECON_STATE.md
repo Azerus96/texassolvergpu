@@ -640,6 +640,119 @@ Per-board loop (batch): for each board → init → allocate → gpu-solve → p
 - Kernel inventory: `/kaggle/working/re_lab/texassolvergpu/KERNEL_INVENTORY.json`
 - All recon documents: `/kaggle/working/re_lab/texassolvergpu/*.md`
 
+## 22.5 POKER_GPU_* ENVIRONMENT VARIABLES (47 total — NEW)
+
+All read via `GetEnvironmentVariableW`. Documented in `ENV_VARS_AND_RUNTIME_CONFIG_RECON.md`. Key categories:
+
+| Category | Variables |
+|----------|-----------|
+| File-backed I/O | `POKER_GPU_FILE_BACKED_DIR`, `FILE_BACKED_RESULTS`, `FILE_BACKED_THRESHOLD_MB`, `FILE_COALESCE_GAP`, `FILE_QUEUE_BUDGET` |
+| CFV/staging | `POKER_GPU_CFV_STAGING`, `POKER_GPU_PACKED_STATE`, `POKER_GPU_PACKED_STATE_MIN_SAVINGS_MB` |
+| Compact/archive | `POKER_GPU_COMPACT_BACKWARD_CACHE`, `POKER_GPU_COMPACT_INVALID_REGRETS`, `POKER_GPU_COMPACT_REGRET_ALIGNMENT` |
+| CUDA graph | `POKER_GPU_CUDA_GRAPH`, `POKER_GPU_DIAG_GRAPH` |
+| Diagnostics | `POKER_GPU_DIAG_FILE_BACKING`, `POKER_GPU_DIAG_FINALIZE`, `POKER_GPU_DIAG_PERSISTENT_BACKWARD`, `POKER_GPU_DIAG_RIVER_FORWARD`, `POKER_GPU_DIAG_TIMING` |
+| Pipeline | `POKER_GPU_DUAL_RIVER_PIPELINE`, `POKER_GPU_PERSISTENT_RIVER_FORWARD`, `POKER_GPU_RIVER_BATCH`, `POKER_GPU_RIVER_BATCH_NODES` |
+| Kernel fusion | `POKER_GPU_FUSE_FOLD_SHOW`, `POKER_GPU_FUSE_MIXED_FOLD_SHOW`, `POKER_GPU_FUSE_OPPONENT_TERMINAL_PARENT`, `POKER_GPU_FUSE_SHOW_CONTINUATION`, `POKER_GPU_FUSE_TERMINAL_PARENT` |
+| Memory | `POKER_GPU_MEMORY_BREAKDOWN`, `POKER_GPU_HOST_WORKSPACE`, `POKER_GPU_MAPPED_FILE_WRITES`, `POKER_GPU_MAPPED_TRIM_BYTES` |
+| Showdown/fold | `POKER_GPU_FOLD_FP32`, `POKER_GPU_FOLD_SHOWDOWN_BLOCK`, `POKER_GPU_SHOWDOWN_BLOCK`, `POKER_GPU_SHOWDOWN_64_MAX_OPP` |
+| Forward/backward | `POKER_GPU_FORWARD_BLOCK`, `POKER_GPU_OPP_BACKWARD_BLOCK`, `POKER_GPU_OWN_PARENT_BLOCK`, `POKER_GPU_OWN_PARENT_REGCACHE` |
+| Other | `POKER_GPU_BALANCE_RIVER_PAIRS`, `POKER_GPU_EXACT_FOLD_REDUCTION`, `POKER_GPU_FORCE_OFF64`, `POKER_GPU_FINALIZE_GPU_ENCODE`, `POKER_GPU_MIXED_GENERIC_UPDATE`, `POKER_GPU_OPP_CARD_PREFIX`, `POKER_GPU_PACK_CARD_METADATA`, `POKER_GPU_SMALL_TREE_FUSED` |
+
+---
+
+## 22.6 SOURCE CODE FILE PATHS (NEW)
+
+| Path | Role |
+|------|------|
+| `C:\Users\bupticybee\projects\gpu_solver\solver-cpp\src\gpu_solver.cpp` | Main GPU solver |
+| `C:\Users\bupticybee\projects\gpu_solver\solver-cpp\src\gpu_solver_3p.cpp` | 3-player GPU solver |
+| `C:\Users\bupticybee\projects\gpu_solver\solver-cpp\src\cuda_driver_api.cpp` | CUDA driver API wrapper |
+| `C:\Users\bupticybee\projects\gpu_solver\solver-cpp\include\poker\cuda_buffer.h` | CUDA buffer header |
+| `C:\Users\bupticybee\projects\gpu_solver\solver-cpp\include\poker\cuda_host_memory.h` | CUDA host memory header |
+
+---
+
+## 22.7 ENRICHED API DETAILS (NEW)
+
+### POST /api/allocate
+Body: `{ "require_exact_2p_gpu_layout": true }`
+
+### POST /api/gpu-solve
+Body: `{ "max_iterations": int, "target_exploitability": float, "compute_initial_exploitability": bool, "verbose": bool }`
+
+### POST /api/solve/preflight
+Body: `{}` — returns VRAM check with severity ("critical"|"warning"|null)
+
+### GET /api/solve/status — Enriched response schema
+```json
+{
+  "running": bool,
+  "iteration": int,
+  "max_iterations": int,
+  "exploitability": float | null,
+  "exploitability_iteration": int,
+  "exploitability_elapsed_ms": int,
+  "player0_exploitability": float | null,
+  "player1_exploitability": float | null,
+  "elapsed_ms": int,
+  "stop_requested": bool,
+  "phase": "preparing|allocating|initializing|solving|finalizing|stopping|finished|stopped|error|failed|idle",
+  "last_error": string | null
+}
+```
+
+### POST /api/export/current-street
+Body: `{ history: [], max_nodes: int }` → `{ payload: snapshot }`
+
+### POST /api/export/current-street-file / POST /api/export/full-file
+Body: JSON — exports strategy archive (Avro format)
+
+### GET /api/export/full-file/progress
+Returns export progress percentage
+
+---
+
+## 22.8 TIMING / DEBUG STRINGS (NEW)
+
+| String | Context |
+|--------|---------|
+| `GPU iteration: 0 / %u (exploitability = %.4e)` | Initial iteration log |
+| `GPU iteration: %u / %u (exploitability = %.4e)` | Per-iteration progress |
+| `[gpu timing] submit=%.3f training_sync=%.3f pin_wait=%.3f exploit=%.3f finalize=%.3f total=%.3f ms` | Per-iteration timing breakdown |
+| `[abs_finalize] %s gpu_cfv=%.1fms expand=%.1fms total=%.1fms` | Absolute finalize timing |
+| `[gpu finalize] p0_gpu=%.3f p0_scatter=%.3f p1_gpu=%.3f p1_scatter=%.3f before_unpack=%.3f unpack=%.3f total=%.3f ms` | GPU finalize phase timing |
+| `[gpu finalize] staged CFV enabled: max_plan=%llu total_p0=%llu total_p1=%llu chunks_p0=%u chunks_p1=%u device_capacity=%llu host_capacity=%llu direct_host=%d` | Staged CFV configuration |
+| `gpu_solver_buffer_usage` | Buffer usage metric |
+| `gpu_solver_error.log` | Error log file |
+
+---
+
+## 22.9 BATCH MODE (NEW)
+
+Batch solver supports multiple boards:
+- `boards_input`: text input of board cards (3-5 cards, e.g. `Qs Jh 2h`)
+- `randomBoardCount`: 1-25 random boards (`batch.max_25_error` if exceeded)
+- `duplicate_card_error`: duplicate card validation
+- `invalid_board_len`: board must be 3-5 cards
+- `snapshotBytes`, `resultKey` per job
+- `exportMaxNodes`: 100-100000 nodes per export
+- Persistence warnings: `batch.persistence_warning`, `batch.persistence_limit_warning`, `batch.persistence_space_warning`
+
+---
+
+## 22.10 QUICK START FORMATS (NEW)
+
+| Key | Name | Stack | Ante |
+|-----|------|-------|------|
+| `six` | Cash 6max 100bb | 10000 | 0 |
+| `six50` | Cash 6max 50bb | 5000 | 0 |
+| `sixAnte` | Cash 6max Ante 50bb | 10000 | 16 (0.16bb) |
+| `spin2` | Spin & Go HU | variable | 0 |
+| `spin3` | Spin & Go 3-max | variable | 0 |
+| `hu` | HU Cash | 100bb | 0 |
+
+---
+
 ## 23. TOOLS CREATED (STATIC, READY TO USE)
 
 | Tool | Location | Purpose |
