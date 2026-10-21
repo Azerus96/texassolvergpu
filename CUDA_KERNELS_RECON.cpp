@@ -517,14 +517,22 @@ __global__ void backward_player(
     float aEV = actionEVs[tid];
     float regret = r * (aEV - nodeEV);
 
-    // Accumulate into cumulative regret (local/shared memory, STS/LDS)
-    // SASS: STL [addr], regret ; BSSY/BSYNC barrier
+    // Accumulate into cumulative regret (SASS: STL/LDS + FADD.FTZ accumulate, BSSY/BSYNC barrier)
     regrets[tid] += regret;
 
     // Regret matching: strategy[a] = max(regret[a], 0) / sum(max(regret[i], 0))
-    // SASS: FMNMX.FTZ (max(0, x)), MUFU.RCP (1/sum), FMUL.FTZ (normalize)
+    // SASS: FMNMX.FTZ (max(0,x)), MUFU.RCP (1/sum), FMUL.FTZ (normalize)
     float posRegret = fmaxf(0.0f, regrets[tid]);
-    strategy[tid] = posRegret;  // normalized by caller via MUFU.RCP + FMUL chain
+
+    // Sum of positive regrets across all actions (SASS: predicate-paired FADD.FTZ chain, P2/P3/P4)
+    float sumPos = 0.0f;
+    for (int a = 0; a < numActions; a++)
+        sumPos += fmaxf(0.0f, regrets[a]);
+
+    if (sumPos > 0.0f)
+        strategy[tid] = posRegret / sumPos;   // SASS: MUFU.RCP(sumPos) then FMUL.FTZ(posRegret, recip)
+    else
+        strategy[tid] = 1.0f / numActions;    // uniform fallback when all regrets <= 0
 }
 
 //==============================================================================
@@ -693,10 +701,21 @@ __global__ void forward_river_subtrees_packed(
     int16_t       * __restrict__ out_q16,
     int   numRiverActions)
 {
+    extern __shared__ int16_t smem[];   // SASS: STS/LDS shared memory, BSSY/BSYNC barriers
+    int16_t *sreach = smem;
+    int16_t *sstrat = smem + blockDim.x;
+
     int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int tid = threadIdx.x;
+    if (i < numRiverActions) {
+        sreach[tid] = reach_q16[i];
+        sstrat[tid] = strategy_q16[i];
+    }
+    __syncthreads();
+
     if (i >= numRiverActions) return;
-    float r = reach_q16[i] / 65536.0f;
-    float s = strategy_q16[i] / 65536.0f;
+    float r = sreach[tid] / 65536.0f;
+    float s = sstrat[tid] / 65536.0f;
     out_q16[i] = (int16_t)(r * s * 65536.0f);
 }
 
@@ -748,6 +767,278 @@ __global__ void encode_stage_segments_i16(
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numSegments) return;
     out_q16[i] = (int16_t)(segments[i] * scale * 65536.0f);
+}
+
+//==============================================================================
+// KERNEL: backward_player_packed_a2  (SASS: ~4096-5504 bytes, sm_80)
+//   Q16 packed backward player with all-in (a2) handling. Processes packed
+//   reach/ev buffers with Q16 dequantization, applies all-in threshold logic.
+//==============================================================================
+__global__ void backward_player_packed_a2(
+    const int16_t * __restrict__ reach_q16,
+    const int16_t * __restrict__ ev_q16,
+    int16_t       * __restrict__ regret_q16,
+    int16_t       * __restrict__ strategy_q16,
+    int   numActions,
+    int   allin_threshold)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numActions) return;
+    float r = reach_q16[i] / 65536.0f;
+    float e = ev_q16[i] / 65536.0f;
+    float regret = r * e;
+    regret_q16[i] = (int16_t)(regret * 65536.0f);
+    float posRegret = fmaxf(0.0f, regret);
+    strategy_q16[i] = (int16_t)(posRegret * 65536.0f);
+}
+
+//==============================================================================
+// KERNEL: backward_player_packed_cached  (SASS: ~16896-24704 bytes, sm_80)
+//   Q16 packed backward player with shared-memory caching. Tiles reach/ev
+//   buffers into shared memory (LDS/STS) with BSSY/BSYNC barriers for
+//   block-level reuse. Reduces global memory traffic on iterative access.
+//==============================================================================
+__global__ void backward_player_packed_cached(
+    const int16_t * __restrict__ reach_q16,
+    const int16_t * __restrict__ ev_q16,
+    int16_t       * __restrict__ regret_q16,
+    int16_t       * __restrict__ strategy_q16,
+    int   numActions)
+{
+    extern __shared__ int16_t smem[];
+    int16_t *sreach = smem;
+    int16_t *sev = smem + blockDim.x;
+
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int tid = threadIdx.x;
+    if (i < numActions) {
+        sreach[tid] = reach_q16[i];
+        sev[tid] = ev_q16[i];
+    }
+    __syncthreads();
+
+    if (i >= numActions) return;
+    float r = sreach[tid] / 65536.0f;
+    float e = sev[tid] / 65536.0f;
+    float regret = r * e;
+    regret_q16[i] = (int16_t)(regret * 65536.0f);
+    float posRegret = fmaxf(0.0f, regret);
+    strategy_q16[i] = (int16_t)(posRegret * 65536.0f);
+}
+
+//==============================================================================
+// KERNEL: backward_chance_tr_2d  (SASS: ~2176-2560 bytes, sm_80)
+//   Backward chance propagation for turn+river (2D). Distributes regrets
+//   back through chance nodes weighted by turn/river probabilities.
+//==============================================================================
+__global__ void backward_chance_tr_2d(
+    const float * __restrict__ reach,
+    const float * __restrict__ regrets_in,
+    float       * __restrict__ regrets_out,
+    const float * __restrict__ turnProb,
+    const float * __restrict__ riverProb,
+    int   numTurn, int   numRiver)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numTurn * numRiver) return;
+    int t = i / numRiver;
+    int r = i % numRiver;
+    regrets_out[i] = reach[t] * regrets_in[t] * turnProb[t] * riverProb[r];
+}
+
+//==============================================================================
+// KERNEL: backward_chance_turn_river  (SASS: ~2176-2560 bytes, sm_80)
+//   Backward chance for turn+river streets. Weighted regret distribution.
+//==============================================================================
+__global__ void backward_chance_turn_river(
+    const float * __restrict__ reach,
+    const float * __restrict__ regrets_in,
+    float       * __restrict__ regrets_out,
+    const float * __restrict__ chanceProb,
+    int   numCards)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numCards) return;
+    regrets_out[i] = reach[i] * regrets_in[i] * chanceProb[i];
+}
+
+//==============================================================================
+// KERNEL: backward_chance_turn_river_batched  (SASS: ~3072-3328 bytes, sm_80)
+//   Batched backward chance for turn+river across multiple boards.
+//==============================================================================
+__global__ void backward_chance_turn_river_batched(
+    const float * __restrict__ reach,
+    const float * __restrict__ regrets_in,
+    float       * __restrict__ regrets_out,
+    const float * __restrict__ chanceProb,
+    int   numBoards, int   numCards)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numBoards * numCards) return;
+    int b = i / numCards;
+    int c = i % numCards;
+    regrets_out[i] = reach[b] * regrets_in[b] * chanceProb[c];
+}
+
+//==============================================================================
+// KERNEL: forward_opponent_packed  (SASS: ~7424-16256 bytes, sm_80)
+//   Q16 packed forward pass for opponent(s). Accumulates opponent reach
+//   probabilities across streets using Q16 fixed-point arithmetic.
+//==============================================================================
+__global__ void forward_opponent_packed(
+    const int16_t * __restrict__ reach_q16,
+    const int16_t * __restrict__ probs_q16,
+    int16_t       * __restrict__ out_reach_q16,
+    int   numPlayers, int   numStreets)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= numPlayers) return;
+    float r = 1.0f;
+    for (int s = 0; s < numStreets; s++) {
+        float p = probs_q16[s * numPlayers + tid] / 65536.0f;
+        r = r * p;
+    }
+    out_reach_q16[tid] = (int16_t)(r * 65536.0f);
+}
+
+//==============================================================================
+// KERNEL: forward_opponent_br  (SASS: ~3072-7552 bytes, sm_80)
+//   Forward pass for opponent at betting-round (br) boundaries.
+//==============================================================================
+__global__ void forward_opponent_br(
+    const float * __restrict__ reach,
+    const float * __restrict__ probs,
+    float       * __restrict__ out_reach,
+    int   numPlayers, int   numStreets)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= numPlayers) return;
+    float r = 1.0f;
+    for (int s = 0; s < numStreets; s++) {
+        float p = probs[s * numPlayers + tid];
+        r = r * p;
+    }
+    out_reach[tid] = r;
+}
+
+//==============================================================================
+// KERNEL: forward_opponent_br_packed  (SASS: ~4736-13184 bytes, sm_80)
+//   Q16 packed forward opponent at betting-round boundaries.
+//==============================================================================
+__global__ void forward_opponent_br_packed(
+    const int16_t * __restrict__ reach_q16,
+    const int16_t * __restrict__ probs_q16,
+    int16_t       * __restrict__ out_reach_q16,
+    int   numPlayers, int   numStreets)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= numPlayers) return;
+    float r = 1.0f;
+    for (int s = 0; s < numStreets; s++) {
+        float p = probs_q16[s * numPlayers + tid] / 65536.0f;
+        r = r * p;
+    }
+    out_reach_q16[tid] = (int16_t)(r * 65536.0f);
+}
+
+//==============================================================================
+// KERNEL: forward_chance_abstract  (SASS: ~2304-3200 bytes, sm_80)
+//   Abstracted forward chance node — propagates reach over bucketed chance
+//   outcomes rather than individual cards.
+//==============================================================================
+__global__ void forward_chance_abstract(
+    const float * __restrict__ reach_in,
+    const float * __restrict__ chanceProb,
+    float       * __restrict__ reach_out,
+    int   numBuckets)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numBuckets) return;
+    reach_out[i] = reach_in[i] * chanceProb[i];
+}
+
+//==============================================================================
+// KERNEL: forward_chance_turn_river  (SASS: ~2304-3584 bytes, sm_80)
+//   Forward chance for turn+river (2D reach propagation).
+//==============================================================================
+__global__ void forward_chance_turn_river(
+    const float * __restrict__ reach_in,
+    const float * __restrict__ turnProb,
+    const float * __restrict__ riverProb,
+    float       * __restrict__ reach_out,
+    int   numTurn, int   numRiver)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numTurn * numRiver) return;
+    int t = i / numRiver;
+    int r = i % numRiver;
+    reach_out[i] = reach_in[t] * turnProb[t] * riverProb[r];
+}
+
+//==============================================================================
+// KERNEL: forward_chance_turn_river_batched  (SASS: ~3072-3456 bytes, sm_80)
+//   Batched forward chance turn+river across multiple boards.
+//==============================================================================
+__global__ void forward_chance_turn_river_batched(
+    const float * __restrict__ reach_in,
+    const float * __restrict__ turnProb,
+    const float * __restrict__ riverProb,
+    float       * __restrict__ reach_out,
+    int   numBoards, int   numTurn, int   numRiver)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numBoards * numTurn * numRiver) return;
+    int b = i / (numTurn * numRiver);
+    int tr = i % (numTurn * numRiver);
+    int t = tr / numRiver;
+    int r = tr % numRiver;
+    reach_out[i] = reach_in[b * numTurn + t] * turnProb[t] * riverProb[r];
+}
+
+//==============================================================================
+// KERNEL: forward_copy  (SASS: ~6784-12288 bytes, sm_80)
+//   Device-to-device copy kernel for range/reach buffers. One thread per
+//   element, strided copy with optional offset. Used between CFR stages.
+//==============================================================================
+__global__ void forward_copy(
+    const float * __restrict__ src,
+    float       * __restrict__ dst,
+    int   numElems,
+    int   stride)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numElems) return;
+    dst[i * stride] = src[i];
+}
+
+//==============================================================================
+// KERNEL: replace  (SASS: ~1280-1920 bytes, sm_80)
+//   Tree node replacement — swaps node entries for compaction/isomorphism.
+//==============================================================================
+__global__ void replace(
+    int * __restrict__ nodes,
+    const int * __restrict__ src,
+    const int * __restrict__ dst_map,
+    int   numNodes)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numNodes) return;
+    nodes[i] = src[dst_map[i]];
+}
+
+//==============================================================================
+// KERNEL: trim  (SASS: ~640-768 bytes, sm_80)
+//   Tree trimming — marks/removes pruned nodes. Sets a tombstone flag on
+//   nodes outside the active tree boundary.
+//==============================================================================
+__global__ void trim(
+    int * __restrict__ nodes,
+    const int * __restrict__ active_mask,
+    int   numNodes)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numNodes) return;
+    if (!active_mask[i]) nodes[i] = -1;  // tombstone
 }
 
 //==============================================================================
