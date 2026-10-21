@@ -332,6 +332,8 @@ Signature: `(output* rcx, input_kv_pairs rdx, flags r8b, r9b)`
 
 ## 12. SASS-LEVEL ALGORITHMIC FINDINGS (from disassembly at /tmp/opencode/sass_disasm/)
 
+**22 of 45 kernels documented at SASS level** (details in SASS_KERNEL_DEEP_RECON.md §2–§26). Remaining 23 kernels have disassembly available but no algorithmic reconstruction yet.
+
 ### backward_player (sm_80, 673 instructions) — CFR regret matching
 - **Thread bounds check:** `ISETP.GE.AND P0, PT, R24, c[0x0][0x1c4], PT` then `@P0 EXIT` — checks `threadIdx.x >= numPlayers`
 - **Player loop:** `ISETP.GE.U32.AND P2, PT, R25, 0x3, PT` — checks player index against max 3 players
