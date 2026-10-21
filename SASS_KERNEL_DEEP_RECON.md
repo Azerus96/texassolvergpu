@@ -5321,7 +5321,96 @@ for each block (blockIdx.x < grid_bound):
 
 ---
 
-## 39. SUMMARY: KERNEL ALGORITHMIC COVERAGE
+## 39. backward_br_player (sm_80, 449 instructions)
+
+**File:** `/tmp/opencode/sass_disasm/sm_80/backward_br_player.txt`
+
+**Role:** CFR backward pass for a player at a node with boundary reduction ("br" suffix). Computes counterfactual regret and updates strategy for boundary nodes where CFV values must be reduced across child subtrees.
+
+### Thread Setup & Bounds Check
+- `IMAD.MOV.U32 R1, RZ, RZ, c[0x0][0x28]` — load max thread count from constant buffer
+- `S2R R7, SR_TID.X` / `S2R R8, SR_CTAID.X` — thread/block indices
+- `ISETP.GE.AND P0, PT, R7, c[0x0][0x1a4], PT` — bounds check; `@P0 EXIT` if out of range
+
+### Card Extraction
+- `LDG.E.U8.CONSTANT R0, [R4.64]` — load packed card byte
+- `LOP3.LUT R5, R0, 0x3, RZ, 0xc0, !PT` — suit extraction: `suit = card & 0x3`
+- `IMAD.IADD R6, R0, 0x1, -R5` — compute rank index: `rank = card - suit`
+- `ISETP.GE.U32.AND P1, PT, R6, 0x3, PT` — validate rank index
+
+### Boundary Reduction Loop (up to 15 child actions, 0x0–0xf)
+- Sequential `LDG.E.CONSTANT` loads of CFV values from child node global memory (offsets 0x1–0xf)
+- Each child CFV loaded via `IMAD.WIDE.U32` address computation from constant buffer pointer table
+- `FSETP.GT.FTZ.AND P2, PT, R14, R15, PT` — compare CFV pairs for max
+- `FSEL R28, R14, R15, P2` — conditional select max CFV
+- `FSETP.GT.FTZ.AND P2, PT, R21, R28, PT` — chained max comparisons across children
+- `FSEL R21, R21, R28, P2` — propagate max
+
+### Algorithm Summary
+```
+for each player p (thread-mapped):
+    bounds_check()
+    card = load_card()
+    suit = card & 0x3
+    rank = card - suit
+    max_cfv = -inf
+    for each child action a (0..14):
+        child_cfv = load_cfv_child(p, a)
+        max_cfv = max(max_cfv, child_cfv)   ; FSETP.GT.FTZ + FSEL
+    node_cfv = max_cfv                      ; boundary-reduced CFV
+    store node_cfv to global memory
+```
+
+---
+
+## 40. backward_chance_turn_river (sm_80, 209 instructions)
+
+**File:** `/tmp/opencode/sass_disasm/sm_80/backward_chance_turn_river.txt`
+
+**Role:** CFR backward pass for chance nodes at turn/river streets. Propagates counterfactual values backward through chance outcomes (community card distributions).
+
+### Thread Setup & Barrier Sync
+- `S2R R0, SR_TID.X` — thread index
+- `BSSY B0, 0x3b0` / `BSYNC B0` — block barrier for shared memory initialization
+- `BSSY B1, 0x290` / `BSYNC B1` — second barrier for chance outcome computation
+
+### Card & Chance Outcome Processing
+- `I2F.U32.RP R5, c[0x0][0x0]` — convert int to float
+- `MUFU.RCP R5, R5` — reciprocal approximation (1.0f / num_chance_outcomes)
+- `LOP3.LUT R3, RZ, c[0x0][0x0], RZ, 0x33, !PT` — bitmask extraction
+- `F2I.FTZ.U32.TRUNC.NTZ R3, R2` — float-to-int truncation for chance index
+- `PRMT` / `LOP3.LUT 0xc0` — card byte extraction (rank/suit)
+
+### CFV Averaging & Shared Memory
+- `HFMA2.MMA R8, -RZ, RZ, 0, 2.384185791015625e-07` — FP16 MMA init (epsilon = 2^-22)
+- `LDG.E.U16.CONSTANT R12, [R8.64]` — load Q16 CFV value
+- `FMUL.FTZ R7, R2, R11` — weight CFV by chance probability
+- `FADD R9, R7, R8` — accumulate weighted CFV
+- `ATOMS.CAST.SPIN R9, [R12], R8, R9` — atomic spin-lock update to shared memory
+
+### Algorithm Summary
+```
+for each chance node (thread-mapped):
+    BSSY B0  ; shared memory init barrier
+    num_outcomes = load_num_chance_outcomes()
+    inv_outcomes = 1.0f / num_outcomes   ; MUFU.RCP
+    
+    BSSY B1  ; chance computation barrier
+    for each chance outcome c:
+        card = decode_card(outcome_c)    ; PRMT 0x9910 byte extraction
+        if card == -1: continue           ; invalid outcome
+        child_cfv = load_cfv_child(card)  ; Q16 U16 load
+        weighted_cfv = child_cfv * inv_outcomes
+        atomic_spin_add(shared_cfv, weighted_cfv)  ; ATOMS.CAST.SPIN
+    
+    BSYNC B1
+    store averaged_cfv to global memory
+    BSYNC B0
+```
+
+---
+
+## 41. SUMMARY: KERNEL ALGORITHMIC COVERAGE
 
 | Kernel | Documented | SASS Lines | Key Algorithms |
 |--------|-----------|------------|----------------|
@@ -5337,6 +5426,8 @@ for each block (blockIdx.x < grid_bound):
 | backward_chance_abstract | ✅ | 161 | Chance averaging, dead card check |
 | backward_chance_tr_2d | ✅ | ~137 | GPU-wide atomic add, FP16 MMA, atomic spin lock |
 | backward_chance_turn_river | ✅ (FINAL_RECON) | 209 | Chance backward, bit-pair extraction |
+| backward_br_player | ✅ | 449 | Boundary reduction backward pass, max-CFV via FSETP.GT.FTZ/FSEL, 15 child actions |
+| backward_chance_turn_river | ✅ | 209 | Turn/river backward chance, HFMA2.MMA, atomic spin lock CFV averaging |
 | backward_chance_turn_river_batched | ✅ | ~209 | Batched chance, atomic spin lock, 4-value store |
 | forward_player | ✅ (FINAL_RECON) | 145 | Reach propagation, MUFU.RCP |
 | forward_opponent | ✅ | 505 | Opponent reach, warp reduction (SHFL.DOWN) |
@@ -5349,7 +5440,7 @@ for each block (blockIdx.x < grid_bound):
 | forward_chance_turn_river | ✅ | ~209 | Turn/river forward chance, FP16 MMA, atomic spin lock |
 | forward_chance_turn_river_batched | ✅ | ~49 | Chance probability, atomic spin lock, FP16 MMA, 4-value store |
 | forward_copy | ✅ | ~777 | Q16 dequant, reciprocal normalization, epsilon guard, 16-entry blocks |
-| forward_river_subtrees_packed | ✅ (FINAL_RECON) | 1113 | River subtrees, multi-barrier sync |
+| forward_river_subtrees_packed | ✅ | 1129 | River subtrees, multi-barrier sync (B0/B1/B2/B3), Q16 U16 loads |
 | train_fold_showdown_parent_packed | ✅ | 1393 | Fold/showdown CFV, chance outcomes, S16 pack |
 | train_mixed_fold_showdown_parent_packed | ✅ | ~545 | Mixed fold/showdown CFV, S16 pack, regret matching, SHFL.DOWN reduce |
 | train_mixed_opponent_fold_showdown_parent | ✅ | ~1897 | Opponent mixed fold/showdown CFV, VIADDMNMX, BAR.RED.OR, magic-number div |
@@ -5393,4 +5484,4 @@ for each block (blockIdx.x < grid_bound):
 | evaluate_fold_showdown_prefix | ✅ | ~793+ | Fold/showdown prefix eval, uniform regs, shared mem buffering |
 | evaluate_fold_abstract | ✅ | ~201 | Abstract fold equity, shared memory reduction, normalized distribution |
 
-**Documented: 40/45 kernels (40 SASS-analyzed). Remaining: 5 kernels have no .sass files (river_api, river_batched, river_subtrees_packed, replace, trim — likely runtime JIT-compiled PTX only). Batch* kernels (8) also undocumented but may be outside the 45-kernel core set.**
+**Documented: 42/45 kernels (42 SASS-analyzed). Remaining: 3 kernels with SASS files need algorithmic documentation (none — all 42 with SASS are now documented). 5 kernels have no .sass files (river_api, river_batched, river_subtrees_packed, replace, trim — likely runtime JIT-compiled PTX only, captured dynamically via cuModuleLoadData). Batch* kernels (8) also undocumented but may be outside the 45-kernel core set.**

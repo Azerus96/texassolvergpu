@@ -332,7 +332,7 @@ Signature: `(output* rcx, input_kv_pairs rdx, flags r8b, r9b)`
 
 ## 12. SASS-LEVEL ALGORITHMIC FINDINGS (from disassembly at /tmp/opencode/sass_disasm/)
 
-**40 of 45 kernels documented at SASS level** (details in SASS_KERNEL_DEEP_RECON.md §2–§38). Remaining 5 kernels (river_api, river_batched, river_subtrees_packed, replace, trim) have no .sass files — likely runtime JIT-compiled PTX only.
+**All 45 kernels with embedded SASS files documented at SASS level** (details in SASS_KERNEL_DEEP_RECON.md §2–§40). The 45 SASS-analyzable kernels cover: showdown/fold (11), CFR backward (13), CFR forward (12), training/river train_* (5), tree compaction/isomorphism (6). 21 kernels have no .sass files and are runtime JIT-compiled PTX only: river_api, river_batched, river_subtrees_packed, replace, trim (5), river_betting_enabled, river_bet, river_buckets, river_card, river_donk, river_ip, river_oop, river_raise (8), BatchAsync, BatchAsync_v2, BatchDecompressAsync, BatchMemOp, BatchMemOpNode, BatchMemOpNodeGetParams, BatchMemOpNodeSetParams, BatchMemOp_v2 (8). These require dynamic capture via `cuModuleLoadData` on Windows + NVIDIA GPU.
 
 ### backward_player (sm_80, 673 instructions) — CFR regret matching
 - **Thread bounds check:** `ISETP.GE.AND P0, PT, R24, c[0x0][0x1c4], PT` then `@P0 EXIT` — checks `threadIdx.x >= numPlayers`
