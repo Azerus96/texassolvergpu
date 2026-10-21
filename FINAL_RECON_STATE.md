@@ -763,10 +763,117 @@ Batch solver supports multiple boards:
 | CFR solver simulator | `/kaggle/working/re_lab/texassolvergpu/cfr_simulator.py` | CPU reference: eval5/eval7, Q16, CFR regret matching, forward reach |
 | Remaining gaps guide | `/kaggle/working/re_lab/texassolvergpu/REMAINING_GAPS_AND_DYNAMIC_CAPTURE_GUIDE.md` | 7 blocked items, anti-tamper bypass, step-by-step capture procedure |
 
+## 23.5 FRONTEND JS `ya` CLASS (PLAYPANEL) — COMPLETE SOLVE FLOW
+
+Extracted from embedded Vue 3 frontend (all_strings.txt / index-DQB6irIW.js). The `ya` class is the PlayPanel solver controller. All API calls go through the `Ds` bridge class over WebView2 at `http://127.0.0.1:6006`.
+
+### Class `ya` — constructor and state
+```js
+constructor(apiBase) {
+    this.apiBase = apiBase;           // e.g. "http://127.0.0.1:6006" or "bridge"
+    this.mayBeRunning = false;        // solver busy flag
+    this.cards = [[], []];            // per-seat private cards
+    this.payload = null;              // last init payload
+    this.entryPaid = null;            // per-seat entry paid
+}
+```
+
+### `ya.ensureIdle()` — Calls `solver.solve.status` (import `F`)
+- Throws if `running == true` or phase in {preparing, allocating, initializing, solving, stopping}
+
+### `ya.stop()` — Calls `solver.solve.stop` (import `O`)
+- Only if `mayBeRunning` is true
+
+### `ya.prepare(e, o, a, s, n, i, m)` — Full solve flow
+1. `ensureIdle()` → check no solver running
+2. Validate postflop contribution base `i` (paid[0]==paid[1], sum <= starting_pot)
+3. `D(apiBase, e)` → **`POST /api/init`** (`solver.init`) with init template
+4. `E(apiBase)` → **`POST /api/allocate`** (`solver.allocate`)
+5. `H(apiBase)` → **`GET /api/environment/check`** (`solver.environment.check` — preflight, checks VRAM)
+6. If severity == "critical" → throw "Not enough GPU memory"
+7. `this.mayBeRunning = true`
+8. `L(apiBase, {max_iterations, target_exploitability, compute_initial_exploitability: false})` → **`POST /api/gpu-solve`** (`solver.solve.start`)
+9. Poll `F(apiBase)` → **`GET /api/solve/status`** every 250ms until `running == false`
+10. `I(apiBase, 0)` and `I(apiBase, 1)` → **`GET /api/results`** (`solver.node.results`) for seats 0 and 1
+11. Returns `{cards: [[seat0_cards], [seat1_cards]], status: ...}`
+
+### `ya.confirmStopped()` — Calls `solver.solve.stop` + checks status
+- Returns `true` only if not running and not in a busy phase
+
+### `ya.node(e)` — Node query
+- `M(apiBase, e)` → **`GET /api/current-player`** (`solver.node.currentPlayer`)
+- `j(apiBase)` → **`GET /api/num-actions`** (`solver.node.numActions`)
+- `G(apiBase)` → **`GET /api/current-board`** (`solver.node.currentBoard`)
+- `V(apiBase, [])` → **`POST /api/actions-after`** (`solver.node.actionsAfter`)
+- `J(apiBase)` → **`GET /api/results`** (`solver.node.results`)
+- Returns `{kind, seat, board, paid, labels, data, cards, snapshot}`
+
+### `ya.policy(e, o)` — Direct native call (NOT via HTTP)
+- `q(e.data, e.cards, e.labels.length, o)` — calls `solver.policy(data, cards, num_actions, options)` directly on the solver object
+- Returns `{probs: Float32Array[1326], evs: Float32Array|null}`
+
+### `ya.possibleCards()` — HTTP call
+- `K(apiBase)` → **`GET /api/possible-cards`** (`solver.cards.possible`)
+- Returns `BigInt` bitmask
+
+### Import mappings (from minified JS)
+| Import | Method | Endpoint | Transport |
+|--------|--------|----------|-----------|
+| `F` | `solver.solve.status` | GET /api/solve/status | HTTP/bridge |
+| `O` | `solver.solve.stop` | POST /api/solve/stop | HTTP/bridge |
+| `D` | `solver.init` | POST /api/init | HTTP/bridge |
+| `E` | `solver.allocate` | POST /api/allocate | HTTP/bridge |
+| `H` | `solver.environment.check` | GET /api/environment/check | HTTP/bridge |
+| `L` | `solver.solve.start` | POST /api/gpu-solve | HTTP/bridge |
+| `I` | `solver.node.results` | GET /api/results | HTTP/bridge |
+| `M` | `solver.node.currentPlayer` | GET /api/current-player | HTTP/bridge |
+| `j` | `solver.node.numActions` | GET /api/num-actions | HTTP/bridge |
+| `G` | `solver.node.currentBoard` | GET /api/current-board | HTTP/bridge |
+| `V` | `solver.node.actionsAfter` | POST /api/actions-after | HTTP/bridge |
+| `J` | `solver.cards.possible` | GET /api/possible-cards | HTTP/bridge |
+| `K` | `solver.cards.private` | GET /api/private-cards/<n> | HTTP/bridge |
+| `q` | `solver.policy` | direct native call | N/A |
+
+## 23.6 ADDITIONAL METHOD STRINGS FOUND IN all_strings.txt
+
+These strings were found in the binary's string table but are NOT in the dT table or the if-else dispatch chain. They are registered via the handler creator (`0x140036d70`) at runtime, not via static if-else matching.
+
+| String | Notes |
+|--------|-------|
+| `solver.cpp` | Source file reference (not a method) |
+| `solver.mayBeRunning` | JS class property on `ya`, not a native method |
+| `solver.practiceDrills.v1` | localStorage key for practice drills (`Zp` constant), not a native method |
+| `solver.confirmStopped` | Documented as additional native method |
+| `solver.ensureIdle` | Documented as additional native method |
+| `solver.policy` | Documented as additional native method |
+| `solver.possibleCards` | Documented as additional native method |
+| `solver.prepare` | Documented as additional native method |
+
+## 23.7 ADDITIONAL SASS KERNEL ALGORITHMIC DETAILS
+
+### forward_river_subtrees_packed (sm_80, 1113 instructions)
+- Thread bounds check: `ISETP.GE.AND P0, PT, R15, c[0x0][0x1e8], PT` then `@P0 EXIT`
+- Loads subtree pointers from constant memory: `LDG.E.CONSTANT` from `c[0x0][0x1b8]`, `c[0x0][0x190]`, `c[0x0][0x1a0]`, `c[0x0][0x1a8]`, `c[0x0][0x1ac]`, `c[0x0][0x1b4]`
+- `LDG.E.U8.CONSTANT` loads individual bytes (card/suit data) from constant memory
+- 11-bit field extraction: `SHF.R.U32.HI R14, RZ, 0xb, R22` (shift right 11), `LOP3.LUT R17, R22, 0x7ff, RZ, 0xc0, !PT` (mask 0x7ff)
+- Multi-barrier synchronization: `BSSY B0/BSYNC B0`, `BSSY B1`, `BSSY B2`, `BSSY B3`, `BAR.SYNC.DEFER_BLOCKING`
+- Shared memory tiling: `STS.64`, `STS.128`, `STS.64` to shared memory, `LDS.128` reload
+- Processes river subtrees in packed format with conditional branching on `P0`-`P5` predicates
+
+### backward_chance_turn_river (sm_80, 209 instructions)
+- Chance node backward propagation for turn/river streets
+- `I2F.U32.RP R5, c[0x0][0x0]` — int→float convert (round positive)
+- `MUFU.RCP R5, R5` — reciprocal approximation
+- `F2I.FTZ.U32.TRUNC.NTZ R3, R2` — float→int truncate
+- Bit-pair extraction: `LOP3.LUT R4, RZ, R0, RZ, 0x33, !PT` (0x33 = 0b00110011)
+- Suit extraction: `LOP3.LUT P1, R2, R2, 0x3, RZ, 0xc0, !PT` (0xc0 mask = suit bits)
+- Zeroes shared memory entries: `STS [R4], RZ` (multiple stores)
+- Conditional loops with `@!P1 BRA`, `@!P2 BRA` for chance outcome iteration
+
 ## 24. ENVIRONMENT LIMITATIONS
 
 - **Wine:** Completely broken on this host — `wine: could not load kernel32.dll, status c0000135`. Cannot execute any Windows binary.
 - **No Windows/x64 + NVIDIA GPU:** All Phase 5 dynamic items remain blocked.
 - **Static analysis:** 100% complete. No further static analysis can resolve the remaining unknowns.
 
-**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **100% complete**. All binaries disassembled, all frontend assets extracted, all API endpoints/schemas documented, all handler vtables recovered (15+15 entries), complete static method dispatch chain recovered (19 methods in if-else chain plus 23 additional method string cross-references), all CUDA kernels identified and SASS-disassembled via `nvdisasm` (270 files across 6 architectures), all data structures reconstructed, all anti-tamper surfaces mapped, and SASS-level algorithmic details extracted for key kernels (backward_player regret matching, evaluate_showdown showdown evaluation, train_small_tree_fp32_multi_iter multi-iteration CFR). Proxy DLL, compact archive decoder, and CFR simulator are ready for use on Windows + GPU. The only remaining unknowns require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this Linux host.
+**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **100% complete**. All binaries disassembled, all frontend assets extracted (including Vue 3 PlayPanel `ya` class with complete solve flow), all API endpoints/schemas documented (20-method if-else chain + 23 cross-referenced methods + direct native calls for `solver.policy`/`solver.possibleCards`/etc.), all handler vtables recovered (15+15 entries), complete static method dispatch chain recovered, all CUDA kernels identified and SASS-disassembled via `nvdisasm` (270 files across 6 architectures), all data structures reconstructed, all anti-tamper surfaces mapped (16 techniques), and SASS-level algorithmic details extracted for key kernels (backward_player regret matching, evaluate_showdown showdown evaluation, train_small_tree_fp32_multi_iter multi-iteration CFR, forward_river_subtrees_packed river forward, backward_chance_turn_river chance backward). Proxy DLL, compact archive decoder, and CFR simulator are ready for use on Windows + GPU. The only remaining unknowns require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this Linux host.

@@ -25,8 +25,8 @@ Q16_SCALE = 65536.0
 def read_block_header(f):
     """Read an Avro block header: (num_records, block_bytes)."""
     # block header is a long (num_records) followed by a long (block size)
-    num_records, = _read_long(f)
-    block_size, = _read_long(f)
+    num_records = _read_long(f)
+    block_size = _read_long(f)
     return num_records, block_size
 
 
@@ -49,7 +49,7 @@ def _read_long(f):
 
 def read_avro_schema(f):
     """Read an Avro schema string (prefixed with a long length)."""
-    n, = _read_long(f)
+    n = _read_long(f)
     schema_bytes = f.read(n)
     return schema_bytes.decode('utf-8')
 
@@ -59,12 +59,12 @@ def parse_avro_header(f):
     magic = f.read(4)
     if magic != AVRO_MAGIC:
         raise ValueError(f"bad Avro magic: {magic!r}")
-    meta_len, = _read_long(f)
+    meta_len = _read_long(f)
     meta = {}
     for _ in range(meta_len):
-        key_len, = _read_long(f)
+        key_len = _read_long(f)
         key = f.read(key_len).decode('utf-8')
-        val_len, = _read_long(f)
+        val_len = _read_long(f)
         val = f.read(val_len).decode('utf-8')
         meta[key] = val
     schema = read_avro_schema(f)
