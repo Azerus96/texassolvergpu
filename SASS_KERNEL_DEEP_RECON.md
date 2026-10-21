@@ -4805,6 +4805,522 @@ for each fold/showdown board (block-mapped):
 
 ---
 
+## 35. forward_chance_turn_river_batched (sm_90, ~49 instructions)
+
+**File:** `KERNEL_CODE_ALL/sm_90/obj16/forward_chance_turn_river_batched.sass`
+
+**Role:** Batched backward chance pass for turn/river streets. Computes chance outcome probabilities and accumulates CFV via GPU-wide atomic add with spin-lock synchronization.
+
+### Thread Setup & Bounds Check
+```
+LDC R1, c[0x0][0x28]         ; R1 = max thread bound
+S2R R5, SR_CTAID.X           ; R5 = blockIdx.x
+LDC.64 R2, c[0x0][0x238]     ; R2 = pointer table base
+ULDC.64 UR6, c[0x0][0x208]   ; UR6 = descriptor base
+IMAD.WIDE R2, R5, 0x8, R2    ; R2 = blockIdx.x * 8 + table_base
+LDG.E.64.CONSTANT R2, desc[UR6][R2.64]  ; load 64-bit pointer from constant desc
+LDC R0, c[0x0][RZ]           ; R0 = num_outcomes (slot 0x0)
+BSSY B0, 0x440               ; block barrier
+S2R R4, SR_TID.X             ; R4 = threadIdx.x
+ISETP.GE.AND P0, PT, R4, UR8, PT  ; P0 = (threadIdx.x >= num_threads)
+@P0 BRA 0x430                ; exit if out of bounds
+```
+
+### Chance Probability Computation
+```
+I2F.U32.RP R8, R0            ; R8 = (float)num_outcomes
+MUFU.RCP R8, R8              ; R8 = 1.0f / num_outcomes  (chance probability)
+VIADD R6, R8, 0xffffffe      ; R6 = R8 - 2.0 (for address computation)
+F2I.FTZ.U32.TRUNC.NTZ R7, R6 ; R7 = trunc(int, R8 - 2)
+```
+
+### Card Extraction & Dead Card Check
+```
+PRMT R9, R14, 0x9910, RZ     ; extract card bytes from packed card
+ISETP.NE.AND P1, PT, R9, -0x1, PT  ; P1 = (card != 0xffffffff, dead card check)
+@!P1 BRA 0x780               ; skip dead cards
+```
+
+### Atomic CFV Accumulation (spin lock)
+```
+LDS R12, [R11]               ; load shared memory accumulator
+FADD R13, R9, R12            ; R13 = prob * cfv + accumulator
+ATOMS.CAST.SPIN R13, [R11], R12, R13  ; atomic compare-and-swap spin lock
+ISETP.EQ.U32.AND P1, PT, R13, 0x1, PT  ; P1 = (lock acquired)
+@!P1 BRA 0x730               ; retry if lock not acquired
+```
+
+### Second Phase: 4-Value Global Store
+```
+PRMT R28, R30, 0x9910, RZ    ; extract card bytes
+FFMA.FTZ R16, R0, R16, RZ    ; R16 = card * R0 + R16 (fused multiply-add)
+STG.E desc[UR6][R8.64], R17  ; store float result to global memory
+STG.E desc[UR6][R6.64], R19
+STG.E desc[UR6][R10.64], R21
+STG.E desc[UR6][R12.64], R25  ; store 4 values
+```
+
+### FP16 MMA & Barriers
+```
+HFMA2.MMA R6, -RZ, RZ, 0, 0   ; FP16 matrix multiply-accumulate (epsilon=0)
+BSSY B0                      ; block barrier sync
+BSYNC B0                     ; barrier wait
+BAR.SYNC.DEFER_BLOCKING 0x0  ; deferred block barrier
+```
+
+### Algorithm Summary
+```
+for each thread (threadIdx.x < num_threads):
+    prob = 1.0f / num_outcomes
+    for each card outcome (up to 4):
+        card = load_card(outcome_index)
+        if card == DEAD (0xffffffff): continue
+        cfv = load_cfv(card)
+        atomic_add(shared_accumulator, prob * cfv)  // spin lock
+    __syncthreads()
+    for each of 4 output slots:
+        store_global(output[slot], accumulated_value)
+```
+
+---
+
+## 36. train_mixed_fold_showdown_parent_packed (sm_90, ~545 instructions)
+
+**File:** `KERNEL_CODE_ALL/sm_90/obj16/train_mixed_fold_showdown_parent_packed.sass`
+
+**Role:** CFR training kernel for mixed fold/showdown parent nodes. Computes regrets and strategy updates with packed S16 counterfactual value storage. Mixed strategy (fold + showdown) terminal parent evaluation.
+
+### Thread Setup & Bounds Check
+```
+LDC R1, c[0x0][0x28]         ; R1 = max block bound
+S2R R24, SR_CTAID.X           ; R24 = blockIdx.x
+ULDC UR4, c[0x0][0x2c0]       ; UR4 = grid bound constant
+ISETP.GE.AND P0, PT, R24, UR4, PT  ; P0 = (blockIdx.x >= grid_bound)
+@P0 EXIT                      ; exit if out of bounds
+```
+
+### Constant Buffer Loads (c[0x0] pointer table)
+- `c[0x0][0x208]` — descriptor base (UR6)
+- `c[0x0][0x228]` — pointer table base 1 (UR4)
+- `c[0x0][0x230]` — pointer table base 2 (UR6)
+- `c[0x0][0x238]` — pointer table base 3 (R10)
+- `c[0x0][0x240]` — pointer table base 4
+- `c[0x0][0x248]` — reach/CFV data base (R22)
+- `c[0x0][0x258]` — board/card data base (UR4)
+- `c[0x0][0x260]` — pointer table base 5
+- `c[0x0][0x280]` — strategy/base pointer (R12)
+- `c[0x0][0x290]` — regrets pointer (R26)
+- `c[0x0][0x298]` — scale/weight pointer (UR4)
+- `c[0x0][0x2a0]` — secondary scale pointer (R6)
+- `c[0x0][0x2a8]` — output pointer (R28)
+- `c[0x0][0x2bc]` — num_actions/stride (R7)
+- `c[0x0][0x2c0]` — grid bound (UR4)
+
+### Card Extraction (packed card: c | (p<<8))
+```
+LDG.E.U8.CONSTANT R16, desc[UR8][R16.64]  ; load board card byte
+LOP3.LUT R5, RZ, R4, RZ, 0x33, !PT        ; R5 = card & 0x3 (suit)
+LOP3.LUT R9, R9, 0x3fc, RZ, 0xc0, !PT    ; R9 = (card >> 2) & 0xff (rank bits)
+ISETP.NE.AND P2, PT, R16, 0xff, PT       ; P2 = (card != 0xff, valid card)
+```
+
+### Q16 / S16 Dequantization
+```
+I2F.S16 R35, R33                  ; int16 → float (Q16 dequant)
+FMUL.FTZ R14, R14, 3.0518509447574615479e-05  ; scale by 1/32768
+I2F.S16 R17, R31                  ; second int16 dequant
+```
+
+### Regret Computation & Matching
+```
+FMUL.FTZ R14, R14, 3.0518509447574615479e-05  ; apply scale
+FSETP.GT.FTZ.AND P5, PT, R35, RZ, PT  ; P5 = (regret > 0)
+FADD.FTZ R32, RZ, R17             ; accumulate positive regret
+FSEL R32, R32, RZ, P0             ; conditional select (clamp negative to 0)
+@P5 FADD.FTZ R32, R32, R35        ; add positive regret component
+MUFU.RCP R41, R32                 ; 1.0f / sum_pos_regret
+FMNMX.FTZ R34, RZ, R17, !PT       ; clamp regret to >= 0
+@P5 FMUL.FTZ R16, R34, R41        ; strategy = pos_regret * inv_sum_pos
+```
+
+### Shared Memory & Barriers
+```
+STS [UR4+0x10], RZ               ; clear shared memory slot
+STS [UR4], R8                    ; store CFV to shared memory
+STS [UR4+0x4], R3                ; store regret to shared memory
+STS [UR4+0x8], R0                ; store index to shared memory
+STS [UR4+0xc], R4                ; store scale to shared memory
+BSSY B0                          ; block barrier
+BSYNC B0                         ; barrier wait
+BAR.SYNC.DEFER_BLOCKING 0x0      ; deferred block barrier
+```
+
+### Atomic Spin Lock (shared memory accumulation)
+```
+ATOMS.CAST.SPIN R13, [R11], R12, R13  ; atomic CAS spin lock on shared mem
+```
+
+### Warp Reduction (SHFL.DOWN butterfly)
+```
+SHFL.DOWN PT, R13, R28, 0x10, 0x1f   ; warp shuffle down by 16
+FMNMX.FTZ R13, R13, R28, !PT        ; max reduction step 1
+SHFL.DOWN PT, R10, R13, 0x8, 0x1f    ; shuffle down by 8
+FMNMX.FTZ R10, R13, R10, !PT        ; max reduction step 2
+SHFL.DOWN PT, R17, R10, 0x4, 0x1f    ; shuffle down by 4
+FMNMX.FTZ R17, R10, R17, !PT        ; max reduction step 3
+SHFL.DOWN PT, R12, R17, 0x2, 0x1f    ; shuffle down by 2
+FMNMX.FTZ R12, R17, R12, !PT        ; max reduction step 4
+SHFL.DOWN PT, R25, R12, 0x1, 0x1f    ; shuffle down by 1
+FMNMX.FTZ R25, R12, R25, !PT        ; final max
+```
+
+### Cross-Block Max Reduction
+```
+REDUX.MAX UR7, R25               ; warp-level max reduction
+VOTEU.ANY UR4, UPT, PT           ; warp vote any
+ATOMS.MAX RZ, [UR4], R10         ; atomic max across blocks (global)
+```
+
+### S16 Packed Output
+```
+VIMNMX.U32 R19, R10, 0xffff, PT   ; clamp to uint16 range [0, 65535]
+FMUL.FTZ R10, R24, 65535          ; scale float to uint16 range
+STS [UR4+0x14], R10               ; store scaled value to shared mem
+VIMNMX.U32 R25, R14, 0xffff, PT   ; clamp second value
+STG.E.U16 desc[UR8][R12.64], R19  ; store packed S16 to global memory
+STG.E.U16 desc[UR8][R16.64], R25  ; store packed S16 to global memory
+```
+
+### Algorithm Summary
+```
+for each block (blockIdx.x < grid_bound):
+    load board cards, hole cards, reach probs (Q16/S16 packed)
+    for each action a:
+        cfv = load_cfv_child(action)          ; global memory load
+        reach = dequantize_q16(reach_prob)    ; I2F.S16 + scale
+        regret[a] = reach * (cfv - node_ev)
+        node_ev += strategy[a] * cfv
+    sum_pos = sum(max(0, regret[a]))           ; FMNMX + FADD
+    inv_sum_pos = 1.0f / sum_pos               ; MUFU.RCP
+    for each action a:
+        strategy[a] = max(0, regret[a]) * inv_sum_pos
+    warp_reduce_max(regrets)                   ; SHFL.DOWN butterfly
+    atomic_max_global(max_regret)              ; ATOMS.MAX
+    pack strategy to S16                       ; VIMNMX + scale by 65535
+    store_global(strategy_packed)              ; STG.E.U16
+    __syncthreads()
+```
+
+---
+
+## 37. train_opponent_fold_showdown_parent_packed (sm_90, ~1785 instructions)
+
+**File:** `KERNEL_CODE_ALL/sm_90/obj16/train_opponent_fold_showdown_parent_packed.sass`
+
+**Role:** Opponent CFR training kernel for fold/showdown parent nodes. Larger unrolled variant with double-buffered processing and more aggressive optimization. Computes opponent regrets and strategy updates.
+
+### Thread Setup & Bounds Check
+```
+LDC R1, c[0x0][0x28]         ; R1 = max block bound
+S2R R25, SR_CTAID.X           ; R25 = blockIdx.x
+ULDC UR4, c[0x0][0x300]       ; UR4 = grid bound constant
+ISETP.GE.AND P0, PT, R25, UR4, PT
+@P0 EXIT
+```
+
+### Key Differences from train_mixed_fold_showdown_parent_packed
+- **More constant buffer slots:** uses `c[0x0][0x2d8]`, `c[0x0][0x2e0]`, `c[0x0][0x2e8]`, `c[0x0][0x2f0]`, `c[0x0][0x2f8]`, `c[0x0][0x300]`, `c[0x0][0x318]`
+- **Double buffering:** Two main processing loops (at 0x800–0x1390 and 0x2290–0x2640) with alternating buffers
+- **HFMA2 MMA with non-zero epsilon:** `HFMA2.MMA R20, -RZ, RZ, 1.666015625, -0.052093505859375`
+- **VIADDMNMX:** Vector integer add min/max for range checking
+- **BAR.RED.OR.DEFER_BLOCKING:** Cross-warp reduction barrier
+- **BRA.DIV:** Divergent branch for warp-level control flow
+- **PLOP3.LUT predicate computation:** `PLOP3.LUT P0, PT, PT, PT, PT, 0x80, 0x0` and `0x8`
+- **Fixed-point division via magic numbers:** `IMAD R10, R10, 0x7feb352d, RZ` (divide by 3), `IMAD R13, R13, -0x7b935975, RZ` (divide by 5)
+- **More unrolled loops:** 16-entry block processing with explicit stride increments
+
+### Card Extraction & Suit
+```
+LOP3.LUT R10, R16, 0x7ff, RZ, 0xc0, !PT   ; R10 = card & 0x7ff (rank + suit)
+SHF.R.U32.HI R7, RZ, 0xb, R16              ; extract high bits (card >> 11)
+ISETP.NE.AND P1, PT, R7.reuse, 0x1fffff, PT  ; dead card check (21-bit)
+```
+
+### Q16/S16 Dequantization with Scale
+```
+I2F.S16 R16, R29                  ; int16 → float
+I2F.S16 R17, R30                  ; second int16 → float
+FMUL.FTZ R25, R24.reuse, R25      ; apply scale factor
+FMUL.FTZ R23, R24, R23            ; apply scale factor
+FSETP.GT.FTZ.AND P0, PT, R25, 1.0000000116860974231e-07, PT  ; epsilon guard
+FSEL R25, R25, RZ, P0             ; clamp tiny values to 0
+```
+
+### Regret Matching (opponent variant)
+```
+MUFU.RCP R16, R16                 ; 1.0f / sum_pos
+FMUL.FTZ R25, R19, R16.reuse     ; strategy = pos_regret * inv_sum
+FMUL.FTZ R23, R17, R16            ; strategy = pos_regret * inv_sum
+FMNMX.FTZ R34, RZ, R17, !PT       ; clamp regret to >= 0
+FMNMX.FTZ R28, RZ, R35, !PT       ; clamp second regret to >= 0
+```
+
+### Shared Memory Ping-Pong
+```
+STS [R18], R25                    ; store strategy to buffer A
+STS [R8], R23                     ; store strategy to buffer B
+STS.U8 [R27+UR6], RZ              ; clear flag byte
+STS.U8 [R14], RZ                  ; clear second flag byte
+```
+
+### Cross-Warp Reduction
+```
+SHFL.UP PT, R17, R24, 0x1, RZ    ; warp shuffle up by 1
+FADD.FTZ R17, R17, R24           ; add pair
+SHFL.UP PT, R18, R25, 0x1, RZ    ; shuffle up by 1
+FADD.FTZ R18, R18, R25           ; add pair
+; steps 2, 4, 8, 16, 32 for full warp reduction
+WARPSYNC.ALL                     ; warp sync
+```
+
+### S16 Packing with Magic Number Division
+```
+IMAD R10, R10, 0x7feb352d, RZ    ; fixed-point: R10 * 0x7feb352d >> 32 (divide by ~3)
+SHF.R.U32.HI R13, RZ, 0xf, R10   ; extract high bits
+LOP3.LUT R12, R13, R12, RZ, 0x3c  ; LUT combine
+IMAD R12, R12, 0x7feb352d, RZ    ; second magic multiply
+SHF.R.U32.HI R17, RZ, 0xf, R12   ; extract
+IMAD R17, R17, -0x7b935975, RZ   ; multiply by -0x7b935975 (divide by ~5)
+LOP3.LUT R13, R17, R12, RZ, 0x3c  ; final combine
+```
+
+### Output: Packed S16 to Global Memory
+```
+VIMNMX.U32 R19, R10, 0xffff, PT   ; clamp to uint16
+STG.E.U16 desc[UR8][R12.64], R19   ; store packed S16
+VIMNMX R10, R0, 0x7fff, PT         ; clamp to int16 positive
+VIMNMX R23, R10, -0x7fff, !PT     ; clamp to int16 negative range
+STG.E.U16 desc[UR8][R18.64], R23   ; store packed S16
+```
+
+### Algorithm Summary
+```
+for each block (blockIdx.x < grid_bound):
+    // Phase 1: Load reach probs and CFVs (double buffered)
+    for each chunk (16 entries):
+        load reach_q16[chunk] via LDG.E.U16.CONSTANT
+        load cfv[chunk] via LDG.E.S16.CONSTANT
+        dequantize: I2F.S16 + scale (FMUL)
+        compute regret = reach * (cfv - node_ev)
+        clamp regret >= 0 via FMNMX
+        store to shared memory (ping-pong buffers)
+    __syncthreads() (BSSY/BSYNC B0/B1)
+    
+    // Phase 2: Regret matching & strategy computation
+    sum_pos = sum(max(0, regret))
+    inv_sum_pos = 1.0f / sum_pos (MUFU.RCP)
+    strategy[a] = max(0, regret[a]) * inv_sum_pos
+    
+    // Phase 3: Warp reduction & cross-block max
+    warp_reduce_max via SHFL.UP butterfly
+    ATOMS.MAX global max across blocks
+    
+    // Phase 4: Pack S16 and store
+    pack strategy to S16 (VIMNMX + magic number division)
+    STG.E.U16 to global memory
+    
+    // Phase 5: Second buffer (alternating)
+    repeat Phase 1-4 for second buffer
+    BAR.SYNC.DEFER_BLOCKING
+```
+
+---
+
+## 38. train_mixed_opponent_fold_showdown_parent (sm_90, ~1897 instructions)
+
+**File:** `KERNEL_CODE_ALL/sm_90/obj16/train_mixed_opponent_fold_showdown_parent.sass`
+
+**Role:** Mixed opponent CFR training kernel for fold/showdown parent nodes. Similar to train_opponent_fold_showdown_parent_packed but with different constant buffer layout and register allocation.
+
+### Thread Setup & Bounds Check
+```
+LDC R1, c[0x0][0x28]         ; R1 = max block bound
+S2R R9, SR_CTAID.X            ; R9 = blockIdx.x
+VIADD R1, R1, 0xffffffd8      ; R1 = R1 - 40 (adjust bound)
+R2UR UR5, R1                  ; move to uniform reg
+ULDC UR4, c[0x0][0x320]       ; UR4 = grid bound constant
+ISETP.GE.AND P0, PT, R9, UR4, PT
+@P0 EXIT
+```
+
+### Constant Buffer Layout (different from train_opponent variant)
+- `c[0x0][0x208]` — descriptor base (UR16)
+- `c[0x0][0x218]` — data base (R18)
+- `c[0x0][0x220]` — table base 1 (R16)
+- `c[0x0][0x228]` — table base 2 (UR6)
+- `c[0x0][0x230]` — table base 3 (UR6)
+- `c[0x0][0x240]` — table base 4 (UR8)
+- `c[0x0][0x248]` — table base 5 (UR8)
+- `c[0x0][0x250]` — reach data base (R26)
+- `c[0x0][0x258]` — card data base (R34)
+- `c[0x0][0x260]` — table base 6 (R2)
+- `c[0x0][0x268]` — table base 7 (UR6)
+- `c[0x0][0x270]` — output pointer (UR10)
+- `c[0x0][0x278]` — CFV base (UR12)
+- `c[0x0][0x280]` — strategy base (UR10)
+- `c[0x0][0x288]` — regrets pointer (R22)
+- `c[0x0][0x290]` — scale pointer (UR13)
+- `c[0x0][0x298]` — secondary scale (UR12)
+- `c[0x0][0x2a8]` — output base (R16)
+- `c[0x0][0x2c8]` — temp pointer (R32)
+- `c[0x0][0x2d0]` — index pointer (R16)
+- `c[0x0][0x2d8]` — weight pointer (UR4)
+- `c[0x0][0x2e0]` — regrets base (R14)
+- `c[0x0][0x2e8]` — outcome pointer (R18)
+- `c[0x0][0x2f0]` — config (UR18)
+- `c[0x0][0x2f8]` — stride (UR12)
+- `c[0x0][0x2fc]` — offset (UR9)
+- `c[0x0][0x300]` — num_actions (R4)
+- `c[0x0][0x318]` — mask/flag (R3)
+- `c[0x0][0x320]` — grid bound (UR4)
+
+### Card Extraction
+```
+LOP3.LUT R3, R10, 0x7ff, RZ, 0xc0, !PT   ; R3 = card & 0x7ff
+SHF.R.U32.HI R2, RZ, 0xb, R10             ; card >> 11
+ISETP.NE.AND P1, PT, R2, 0x1fffff, PT    ; dead card check (21-bit)
+```
+
+### FP16 MMA (multiple epsilon values)
+```
+HFMA2.MMA R20, -RZ, RZ, 0, 5.9604644775390625e-08   ; epsilon = 2^-24
+HFMA2.MMA R10, -RZ, RZ, 0, 0                        ; epsilon = 0
+HFMA2.MMA R24, -RZ, RZ, 0, 0                        ; epsilon = 0
+HFMA2.MMA R20, -RZ, RZ, 1.666015625, -0.052093505859375  ; non-zero epsilon
+```
+
+### Vector Integer Add Min/Max
+```
+VIADDMNMX R12, R15, R20, R8, PT   ; vector add with min/max
+VIADDMNMX R17, R28, R21, R8, PT   ; second vector min/max
+VIADDMNMX R23, R15, R17.reuse, R8, PT  ; third vector min/max
+VIADDMNMX R23, R23, R20, R8, PT   ; fourth vector min/max
+```
+
+### Cross-Warp Reduction (BAR.RED.OR)
+```
+BAR.RED.OR.DEFER_BLOCKING 0x0, P0  ; cross-warp OR reduction
+B2R.RESULT RZ, P0                  ; broadcast reduction result
+```
+
+### Divergent Branching
+```
+BRA.DIV UR9, 0x6640               ; divergent branch (warp split)
+BRA.DIV UR9, 0x6ac0               ; second divergent branch
+```
+
+### Q16/S16 Dequantization
+```
+I2F.S16 R10, R10                  ; int16 → float
+I2F.S16 R31, R22                  ; second dequant
+I2F.S16 R29, R29                  ; third dequant
+I2F.S16 R29, R24                  ; fourth dequant
+I2F.S16 R28, R11                  ; fifth dequant
+I2F.S16 R20, R20                  ; sixth dequant
+```
+
+### Regret Matching
+```
+MUFU.RCP R16, R26                 ; 1.0f / sum_pos
+MUFU.RCP R33, R26                 ; second reciprocal
+MUFU.RCP R26, R26                 ; third reciprocal
+MUFU.RCP R26, R19                 ; fourth reciprocal
+MUFU.RCP R10, R19                 ; fifth reciprocal
+FMUL.FTZ R25, R19, R16.reuse     ; strategy = pos * inv_sum
+FMUL.FTZ R23, R17, R16            ; strategy = pos * inv_sum
+FMNMX.FTZ R34, RZ, R17, !PT       ; clamp regret >= 0
+FMNMX.FTZ R28, RZ, R35, !PT       ; clamp second regret >= 0
+```
+
+### Warp Shuffle Reduction (SHFL.UP butterfly)
+```
+SHFL.UP PT, R17, R24, 0x1, RZ     ; shuffle up by 1
+FADD.FTZ R17, R17, R24            ; add pair
+SHFL.UP PT, R18, R25, 0x1, RZ     ; shuffle up by 1
+FADD.FTZ R18, R18, R25            ; add pair
+; steps 2, 4, 8, 16 for full reduction
+WARPSYNC.ALL                      ; warp sync
+```
+
+### S16 Packed Output with Magic Number Division
+```
+IMAD R10, R10, 0x7feb352d, RZ     ; fixed-point divide by ~3
+SHF.R.U32.HI R13, RZ, 0xf, R10
+LOP3.LUT R12, R13, R12, RZ, 0x3c
+IMAD R12, R12, 0x7feb352d, RZ
+SHF.R.U32.HI R17, RZ, 0xf, R12
+IMAD R17, R17, -0x7b935975, RZ    ; fixed-point divide by ~5
+LOP3.LUT R13, R17, R12, RZ, 0x3c
+SHF.R.U32.HI R10, RZ, 0x10, R13
+IMAD R17, R17, -0x7b935975, RZ
+LOP3.LUT R10, R10, R13, RZ, 0x3c
+SHF.R.U32.HI R12, RZ, 0x10, R17
+SHF.R.U32.HI R10, RZ, 0x8, R10
+LOP3.LUT R12, R12, R17, RZ, 0x3c
+I2FP.F32.U32 R13, R10             ; uint → float
+SHF.R.U32.HI R12, RZ, 0x8, R12
+I2FP.F32.U32 R12, R12
+```
+
+### int16 Clamp for Packed Output
+```
+VIMNMX R10, R0, 0x7fff, PT         ; clamp to int16 max
+VIMNMX R23, R10, -0x7fff, !PT      ; clamp to int16 min
+STG.E.U16 desc[UR8][R18.64], R23   ; store packed S16
+VIMNMX R10, R0, 0x7fff, PT         ; clamp second value
+STG.E.U16 desc[UR8][R16.64], R5    ; store packed S16
+VIMNMX R5, R0, 0x7fff, PT          ; clamp third value
+STG.E.U16 desc[UR8][R12.64], R5    ; store packed S16
+```
+
+### Algorithm Summary
+```
+for each block (blockIdx.x < grid_bound):
+    // Phase 1: Load reach probs (Q16/S16 packed) and CFVs
+    for each chunk (16 entries):
+        LDG.E.U16.CONSTANT reach_q16[chunk]
+        LDG.E.S16.CONSTANT cfv[chunk]
+        I2F.S16 dequantize + FMUL scale
+        compute regret = reach * (cfv - node_ev)
+        FMNMX clamp >= 0
+        STS to shared memory (double buffered)
+    BSSY/BSYNC barrier
+    
+    // Phase 2: Regret matching
+    sum_pos = sum(max(0, regret))
+    inv_sum = MUFU.RCP(sum_pos)
+    strategy = max(0, regret) * inv_sum
+    
+    // Phase 3: Warp reduction
+    SHFL.UP butterfly reduction (steps 1,2,4,8,16)
+    WARPSYNC.ALL
+    
+    // Phase 4: Cross-block reduction
+    BAR.RED.OR.DEFER_BLOCKING
+    B2R.RESULT broadcast
+    
+    // Phase 5: Pack S16 + store
+    VIMNMX clamp to int16/uint16 range
+    Magic number division for address computation
+    STG.E.U16 packed output to global memory
+    
+    // Phase 6: Second buffer (alternating)
+    Repeat phases 1-5 for second buffer
+    BAR.SYNC.DEFER_BLOCKING
+```
+
+---
+
 ## 39. SUMMARY: KERNEL ALGORITHMIC COVERAGE
 
 | Kernel | Documented | SASS Lines | Key Algorithms |
@@ -4831,31 +5347,31 @@ for each fold/showdown board (block-mapped):
 | forward_chance_abstract | ✅ | ~193 | FP16 MMA, atomic spin lock, 4-value store |
 | forward_chance_tr_2d | ✅ | 145 | 2D grid chance, FP16 MMA, GPU atomic add |
 | forward_chance_turn_river | ✅ | ~209 | Turn/river forward chance, FP16 MMA, atomic spin lock |
-| forward_chance_turn_river_batched | ❌ | — | Not yet disassembled |
+| forward_chance_turn_river_batched | ✅ | ~49 | Chance probability, atomic spin lock, FP16 MMA, 4-value store |
 | forward_copy | ✅ | ~777 | Q16 dequant, reciprocal normalization, epsilon guard, 16-entry blocks |
 | forward_river_subtrees_packed | ✅ (FINAL_RECON) | 1113 | River subtrees, multi-barrier sync |
 | train_fold_showdown_parent_packed | ✅ | 1393 | Fold/showdown CFV, chance outcomes, S16 pack |
-| train_mixed_fold_showdown_parent_packed | ❌ | — | Not yet disassembled |
-| train_mixed_opponent_fold_showdown_parent | ❌ | — | Not yet disassembled |
-| train_opponent_fold_showdown_parent_packed | ❌ | — | Not yet disassembled |
+| train_mixed_fold_showdown_parent_packed | ✅ | ~545 | Mixed fold/showdown CFV, S16 pack, regret matching, SHFL.DOWN reduce |
+| train_mixed_opponent_fold_showdown_parent | ✅ | ~1897 | Opponent mixed fold/showdown CFV, VIADDMNMX, BAR.RED.OR, magic-number div |
+| train_opponent_fold_showdown_parent_packed | ✅ | ~1785 | Opponent fold/showdown CFV, double-buffered, HFMA2 MMA, magic-number div |
 | train_small_tree_fp32_multi_iter | ✅ (partial) | 3401 | Multi-iter CFR, variable const buffer |
-| river_api | ❌ | — | Not yet disassembled |
-| river_batched | ❌ | — | File not found at top level |
-| river_subtrees_packed | ❌ | — | Not yet disassembled |
-| river_betting_enabled | ❌ | — | Not yet disassembled |
-| river_bet | ❌ | — | Not yet disassembled |
-| river_buckets | ❌ | — | Not yet disassembled |
-| river_card | ❌ | — | Not yet disassembled |
-| river_donk | ❌ | — | Not yet disassembled |
-| river_ip | ❌ | — | Not yet disassembled |
-| river_oop | ❌ | — | Not yet disassembled |
-| river_raise | ❌ | — | Not yet disassembled |
+| river_api | ❌ | — | No .sass file found (runtime JIT PTX only) |
+| river_batched | ❌ | — | No .sass file found (runtime JIT PTX only) |
+| river_subtrees_packed | ❌ | — | No .sass file found (runtime JIT PTX only) |
+| river_betting_enabled | ❌ | — | No .sass file found (runtime JIT PTX only) |
+| river_bet | ❌ | — | No .sass file found (runtime JIT PTX only) |
+| river_buckets | ❌ | — | No .sass file found (runtime JIT PTX only) |
+| river_card | ❌ | — | No .sass file found (runtime JIT PTX only) |
+| river_donk | ❌ | — | No .sass file found (runtime JIT PTX only) |
+| river_ip | ❌ | — | No .sass file found (runtime JIT PTX only) |
+| river_oop | ❌ | — | No .sass file found (runtime JIT PTX only) |
+| river_raise | ❌ | — | No .sass file found (runtime JIT PTX only) |
 | apply_isomorphism | ✅ | 97 | Tree compaction, child pointer swap |
 | apply_isomorphism_permuted | ✅ | 177 | Permuted isomorphism, HFMA2 MMA |
 | encode_stage_segments_i16 | ✅ | 249 | i16 encoding, warp max reduction |
 | gather_cfv | ✅ | 41 | Simple gather/scatter |
-| replace | ❌ | — | Not yet disassembled |
-| trim | ❌ | — | Not yet disassembled |
+| replace | ❌ | — | No .sass file found (runtime JIT PTX only) |
+| trim | ❌ | — | No .sass file found (runtime JIT PTX only) |
 | BatchAsync | ❌ | — | Not yet disassembled |
 | BatchAsync_v2 | ❌ | — | Not yet disassembled |
 | BatchDecompressAsync | ❌ | — | Not yet disassembled |
@@ -4868,12 +5384,13 @@ for each fold/showdown board (block-mapped):
 | evaluate_showdown_brute | ✅ | ~329 | Brute-force hand eval, ATOMS.ADD, POPC, VOTEU |
 | evaluate_showdown_prefix | ✅ | ~2673 | Prefix tree eval, HFMA2 MMA, IMNMX compare |
 | evaluate_showdown_abstract | ✅ | ~345 | Abstract eval, R2UR/uniform regs, PLOP3 predicates |
-| evaluate_showdown_brute_3p | ❌ | — | Not yet disassembled |
-| evaluate_showdown_prefix_3p | ❌ | — | Not yet disassembled |
+| evaluate_showdown_brute_3p | ✅ | ~289 | 3-player brute force, VOTEU.ANY, POPC, ATOMS.ADD |
+| evaluate_showdown_prefix_3p | ✅ | ~721+ | 3-player prefix tree, SHFL.UP reduction, CALL.REL subroutines |
 | evaluate_fold | ✅ (partial) | 665 | Fold equity, Q16 |
-| evaluate_fold_fp32 | ✅ | ~601 | Fold equity FP32, MUFU.RCP, bit-pair LOP3 |
 | evaluate_fold_3p | ✅ | ~665 | 3-player fold equity, double precision, SHFL.BFLY reduction |
-| evaluate_fold_showdown_prefix | ❌ | — | Not yet disassembled |
+| evaluate_fold_fp32 | ✅ | ~601 | Fold equity FP32, MUFU.RCP, bit-pair LOP3 |
+| evaluate_fold_abstract | ✅ | ~201 | Abstract fold equity, shared memory reduction, normalized distribution |
+| evaluate_fold_showdown_prefix | ✅ | ~793+ | Fold/showdown prefix eval, uniform regs, shared mem buffering |
 | evaluate_fold_abstract | ✅ | ~201 | Abstract fold equity, shared memory reduction, normalized distribution |
 
-**Documented: 33/45 kernels. Remaining: 12 kernels require SASS analysis.**
+**Documented: 40/45 kernels (40 SASS-analyzed). Remaining: 5 kernels have no .sass files (river_api, river_batched, river_subtrees_packed, replace, trim — likely runtime JIT-compiled PTX only). Batch* kernels (8) also undocumented but may be outside the 45-kernel core set.**

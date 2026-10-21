@@ -332,7 +332,7 @@ Signature: `(output* rcx, input_kv_pairs rdx, flags r8b, r9b)`
 
 ## 12. SASS-LEVEL ALGORITHMIC FINDINGS (from disassembly at /tmp/opencode/sass_disasm/)
 
-**33 of 45 kernels documented at SASS level** (details in SASS_KERNEL_DEEP_RECON.md §2–§35). Remaining 12 kernels have disassembly available but no algorithmic reconstruction yet.
+**36 of 45 kernels documented at SASS level** (details in SASS_KERNEL_DEEP_RECON.md §2–§38). Remaining 9 kernels have disassembly available but no algorithmic reconstruction yet.
 
 ### backward_player (sm_80, 673 instructions) — CFR regret matching
 - **Thread bounds check:** `ISETP.GE.AND P0, PT, R24, c[0x0][0x1c4], PT` then `@P0 EXIT` — checks `threadIdx.x >= numPlayers`
@@ -500,6 +500,42 @@ Signature: `(output* rcx, input_kv_pairs rdx, flags r8b, r9b)`
 - Card index: modulo via `IMAD.HI.U32` 64-bit multiply
 - Output: `STG.E [R8.64], R11` (normalized result) or `STG.E [R8.64], R0` (zero)
 - Multiple output stores (up to 4 values) with predicate-gated addressing
+
+### evaluate_showdown_brute_3p (sm_80, ~289 instructions) — 3-player brute force showdown
+- Thread bounds check: `blockIdx.x >= c[0x0][0x1e4]` → EXIT
+- Card extraction: `PRMT R27, R22, 0x7771, RZ` (permute 0x7771), `LOP3.LUT R25, R22, 0xff, RZ, 0xc0, !PT` (suit = card & 3)
+- Dead card detection: `ISETP.EQ.OR` chains comparing vs board cards
+- Warp operations: `VOTEU.ANY UR8, UPT, PT` (warp vote any), `POPC R15, UR8` (population count)
+- Atomic aggregation: `ATOMS.ADD R18, [UR5], R15`, `SHFL.IDX PT, R18, R18, R17, 0x1f` (warp shuffle by index)
+- Card comparison: `PRMT` with 0x7771 permutation, `LOP3.LUT 0xff/0xc0` suit extraction
+- Rank comparison: `ISETP.GE.U32.AND` / `ISETP.GT.U32.AND`
+- EV accumulation: `FSEL` conditional select, `FADD.FTZ` chains
+- Final EV: `FMUL.FTZ R11, R2, R11` + `FFMA.FTZ R11, R0, R13, R11`
+- Output: `STG.E [R14.64], R11`
+
+### evaluate_showdown_prefix_3p (sm_80, ~721+ instructions) — 3-player prefix tree showdown
+- Thread bounds check: `blockIdx.x >= c[0x0][0x1f4]` → EXIT
+- Prefix tree node loading: `LDG.E.CONSTANT` from pointer tables
+- Shared memory: `STS [R3.X4+0x20], R8` (store prefix tree node)
+- Large buffer clear: 14× `STS [R11+offset], RZ` (0x100 stride up to 0xd00)
+- Prefix tree traversal: `IABS` (absolute value), `MUFU.RCP`, modulo via `IMAD.HI.U32`
+- Card index: `LOP3.LUT R3, R3, c[0x0][0x0], RZ, 0x3c, !PT` (bit manipulation mask 0x3c)
+- Large-scale accumulation: repeated `LDS` / `FADD.FTZ` / `STS` chains (16 values per block, 0x40-byte stride)
+- Warp reduction: `SHFL.UP PT, R*, R*, 0x1/0x2/0x4/0x8/0x10/0x20, RZ` (6 steps)
+- Inline subroutines: `CALL.REL.NOINC 0x2be0` / `RET.REL.NODEC R4 0x0`
+- Divergent branching: `BRA.DIV UR6, 0x2a80`
+- Integer min/max: `IMNMX R2, R0, R5, PT`
+- Output: `STS [R9], R8` (store warp sum)
+
+### evaluate_fold_showdown_prefix (sm_80, ~793+ instructions) — Fold/showdown prefix eval
+- Thread bounds check: `blockIdx.x >= c[0x0][0x214]` → EXIT
+- Card extraction: `LOP3.LUT R9, R2, 0x1f, RZ, 0xc0, !PT` (rank = card & 0x1f), `LOP3.LUT R11, R11, 0x7c, RZ, 0xc0, !PT`
+- Uniform register broadcast: `R2UR UR4, R4`, `ULOP3.LUT UR6, UR6, 0x1, URZ, 0x3c, !UPT`
+- Shared memory clearing: 14× `STS [R11+offset], RZ` (0x100 stride up to 0xd00)
+- Prefix tree accumulation: `FADD.FTZ` chains, `STS` / `LDS` shared memory ops
+- IMNMX: `IMNMX R16, R16, UR7, PT` (integer min/max)
+- WARPSYNC + BAR.SYNC.DEFER_BLOCKING
+- Output: `STG.E [R4.64], R7` (store result)
 
 ### Key SASS instruction reference
 | Instruction | Meaning |
