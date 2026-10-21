@@ -72,11 +72,11 @@ All static reverse engineering of TexasSolverGPU v0.3.0 is complete. The binary 
 
 ---
 
-## 6. SASS-LEVEL ALGORITHMIC COVERAGE (36/45 kernels documented)
+## 6. SASS-LEVEL ALGORITHMIC COVERAGE (40/45 kernels documented)
 
-**Documented:** `backward_player`, `backward_player_cfv`, `backward_player_cfv_packed`, `backward_player_packed`, `backward_player_packed_a2`, `backward_player_packed_cached`, `backward_opponent`, `backward_opponent_boundary_iso`, `backward_chance_abstract`, `forward_player`, `forward_opponent`, `forward_opponent_packed`, `apply_isomorphism`, `apply_isomorphism_permuted`, `encode_stage_segments_i16`, `gather_cfv`, `evaluate_showdown`, `train_small_tree_fp32_multi_iter`, `forward_river_subtrees_packed`, `backward_chance_turn_river`, `evaluate_fold` (partial), `forward_chance_tr_2d`, `train_fold_showdown_parent_packed`, `evaluate_showdown_brute`, `evaluate_showdown_prefix`, `evaluate_showdown_abstract`, `evaluate_fold_fp32`
+**Documented:** `backward_player`, `backward_player_cfv`, `backward_player_cfv_packed`, `backward_player_packed`, `backward_player_packed_a2`, `backward_player_packed_cached`, `backward_opponent`, `backward_opponent_boundary_iso`, `backward_br_player`, `backward_chance_abstract`, `backward_chance_tr_2d`, `backward_chance_turn_river`, `backward_chance_turn_river_batched`, `forward_player`, `forward_opponent`, `forward_opponent_packed`, `forward_opponent_br`, `forward_opponent_br_packed`, `forward_chance`, `forward_chance_abstract`, `forward_chance_tr_2d`, `forward_chance_turn_river`, `forward_chance_turn_river_batched`, `forward_copy`, `forward_river_subtrees_packed`, `train_fold_showdown_parent_packed`, `train_mixed_fold_showdown_parent_packed`, `train_mixed_opponent_fold_showdown_parent`, `train_opponent_fold_showdown_parent_packed`, `train_small_tree_fp32_multi_iter`, `apply_isomorphism`, `apply_isomorphism_permuted`, `encode_stage_segments_i16`, `gather_cfv`, `evaluate_showdown`, `evaluate_showdown_brute`, `evaluate_showdown_prefix`, `evaluate_showdown_abstract`, `evaluate_showdown_brute_3p`, `evaluate_showdown_prefix_3p`, `evaluate_fold`, `evaluate_fold_fp32`, `evaluate_fold_3p`, `evaluate_fold_abstract`, `evaluate_fold_showdown_prefix`
 
-**Undocumented (9 kernels):** SASS disassembly available at `/tmp/opencode/sass_disasm/<arch>/<kernel>.txt` but no algorithmic reconstruction yet.
+**Undocumented (5 kernels, no .sass files — runtime JIT PTX only):** `river_api`, `river_batched`, `river_subtrees_packed`, `replace`, `trim`.
 
 Key algorithms reconstructed: CFR regret matching (FMNMX + MUFU.RCP), Q16 fixed-point (I2F.U16, dequantize /65536), card encoding (PRMT 0x9910 byte extraction, LOP3 0xc0 suit extraction), eval5/eval7 hand ranking, warp reduction (SHFL.DOWN), shared memory barriers (BSSY/BSYNC), double-precision EV (DADD/DMUL).
 
