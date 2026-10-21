@@ -332,7 +332,7 @@ Signature: `(output* rcx, input_kv_pairs rdx, flags r8b, r9b)`
 
 ## 12. SASS-LEVEL ALGORITHMIC FINDINGS (from disassembly at /tmp/opencode/sass_disasm/)
 
-**22 of 45 kernels documented at SASS level** (details in SASS_KERNEL_DEEP_RECON.md §2–§26). Remaining 23 kernels have disassembly available but no algorithmic reconstruction yet.
+**33 of 45 kernels documented at SASS level** (details in SASS_KERNEL_DEEP_RECON.md §2–§35). Remaining 12 kernels have disassembly available but no algorithmic reconstruction yet.
 
 ### backward_player (sm_80, 673 instructions) — CFR regret matching
 - **Thread bounds check:** `ISETP.GE.AND P0, PT, R24, c[0x0][0x1c4], PT` then `@P0 EXIT` — checks `threadIdx.x >= numPlayers`
@@ -381,6 +381,125 @@ Signature: `(output* rcx, input_kv_pairs rdx, flags r8b, r9b)`
 - Outer loop over hands: `VIADD R4 += UR5` (hand stride increment)
 - Per action: `reach_out = reach * strategy[a]`, `STG.E` to global memory
 - Predicate-gated stores for up to 3+ actions
+
+### backward_br_player (sm_80, 449 instructions) — Best response CFV max reduction
+- Thread bounds check: `ISETP.GE.AND P0, PT, R7, c[0x0][0x1a4], PT` then `@P0 EXIT`
+- Card extraction: `LOP3.LUT R5, R0, 0x3, RZ, 0xc0, !PT` (suit = card & 3)
+- Dead card check: `ISETP.NE.AND P0, PT, R0, RZ, PT`
+- Main loop processes 16-entry blocks: `IADD3 R8, R8, -0x10, RZ` (decrement by 16)
+- Max reduction via `FSETP.GT.FTZ` + `FSEL` (fmax pattern across 16 values)
+- Predicate LUT: `PLOP3.LUT P0, PT, PT, PT, PT, 0x80, 0x0`
+- Output: `STG.E [R8.64], R15` — stores max CFV to global memory
+- Error handler: `CALL.REL.NOINC 0x1b10` then `BRA 0x180` (loop back)
+
+### backward_chance_tr_2d (sm_80, ~137 instructions) — Backward chance, GPU-wide atomic add
+- 2D grid: `blockIdx.x` = node, `blockIdx.y` = street
+- Chance probability: `I2F.U32.RP` + `MUFU.RCP` (1.0f / num_outcomes)
+- Card index: modulo via `IMAD.HI.U32` 64-bit multiply
+- Dead card check: `PRMT R10, R12, 0x9910, RZ` + `ISETP.NE.AND P1, PT, R10, -0x1, PT`
+- FP16 MMA: `HFMA2.MMA` with epsilon 2.38e-07
+- Atomic spin lock: `ATOMS.CAST.SPIN` + spin-wait loop
+- GPU-wide atomic add: `RED.E.ADD.F32.FTZ.RN.STRONG.GPU`
+- `WARPSYNC 0xffffffff` + `BAR.SYNC.DEFER_BLOCKING`
+
+### forward_chance (sm_80, ~153 instructions) — Forward chance probability distribution
+- Thread bounds check: `threadIdx.x >= c[0x0][0x18c]` → EXIT
+- Uniform register broadcast: `R2UR UR5, R6`, `ULOP3.LUT UR7, UR6, 0x3, URZ, 0xc0, !UPT` (suit = card & 3)
+- Card index computation: `UIADD3 UR9, UR5, 0x3, URZ` (card+0..3, card-1)
+- Probability: `MUFU.RCP` + `FMUL.FTZ` + epsilon guard (`FSETP.GT.FTZ` + `FSEL`)
+- Predicate-gated stores for up to 4 outcomes: `STG.E [R12.64], R3`
+- Loop over nodes: `IADD3 R4, R4, c[0x0][0x0], RZ` + bounds check
+
+### forward_chance_abstract (sm_80, ~193 instructions) — Abstract forward chance
+- Card index: modulo via `IMAD.HI.U32` 64-bit multiply
+- FP16 MMA: `HFMA2.MMA` with epsilon = 0
+- Atomic spin lock: `ATOMS.CAST.SPIN` + spin-wait
+- Accumulator store: `LDS` / `FADD` / `ATOMS.CAST.SPIN`
+- Second phase: loads 4 values from shared memory (`LDS`), stores 4 to global (`STG.E`)
+
+### forward_chance_tr_2d (sm_80, ~145 instructions) — Forward chance, 2D grid, GPU atomic add
+- 2D grid: `blockIdx.x` = node, `blockIdx.y` = street
+- FP16 MMA: `HFMA2.MMA` with epsilon 1.79e-07
+- Atomic spin lock: `ATOMS.CAST.SPIN` + spin-wait
+- GPU-wide atomic add: `RED.E.ADD.F32.FTZ.RN.STRONG.GPU`
+- `WARPSYNC 0xffffffff` + `BAR.SYNC.DEFER_BLOCKING`
+
+### forward_chance_turn_river (sm_80, ~209 instructions) — Turn/river forward chance
+- Thread bounds check: `threadIdx.x >= c[0x0][0x19c]` → BRA
+- FP16 MMA: `HFMA2.MMA` with epsilon = 0
+- Atomic spin lock: `ATOMS.CAST.SPIN` + spin-wait
+- Second phase: loads 4 values from shared memory, stores 4 to global memory
+
+### forward_copy (sm_80, ~777 instructions) — Forward copy with Q16 normalization
+- Thread bounds check: `threadIdx.x >= c[0x0][0x18c]` → EXIT
+- Flag check: `FSETP.NEU.FTZ.AND P0, PT, R0, 1, PT` (skip if pointer == 1)
+- Card extraction: `LOP3.LUT R5, R4.reuse, 0x7, RZ, 0xc0, !PT` (card & 7)
+- Q16 dequant: `I2F.U16 R0, R19` (int16 → float)
+- Normalization: `MUFU.RCP R0, R0` + `FMUL.FTZ R47, R22, R25`
+- Epsilon guard: `FSETP.GT.FTZ.AND P2, PT, R47, 1.0000000116860974231e-07, PT` + `FSEL`
+- Main loop: 16-entry blocks, `IADD3 R2, R2, -0x10, RZ` (decrement by 16)
+- Predicate-gated stores for up to 7 outcomes (P0-P6)
+- Two-phase processing with alternate normalization path
+- Barrier: `BSSY B0`
+- Error handler: `CALL.REL.NOINC 0x1700` / `CALL.REL.NOINC 0x2f70`
+
+### forward_opponent_br (sm_80, ~465 instructions) — Forward opponent best response
+- Thread setup: `threadIdx.x - 32` (warp offset), `R2UR UR16, R1`
+- Bounds check: `threadIdx.x >= c[0x0][0x1b4]` → EXIT
+- Card extraction: `I2F.U16 R0, R19` (Q16 dequant), `LOP3.LUT R16, R19, 0x3, RZ, 0xc0, !PT` (suit = card & 3)
+- Reciprocal: `MUFU.RCP R0, R0`
+- Dead card check: `ISETP.NE.AND P1, PT, R19, RZ, PT`
+- CFV accumulation: `FADD.FTZ` chains across 8 accumulators (R21, R8, R9, R13, R10, R11, R12, R14)
+- 128-bit shared memory: `STL.128 [R0], R8`, `STL.128 [R0+0x10], R8`, `STL.128 [R0+0x20], R12`, `STL.128 [R0+0x30], R8`
+- Main loop: 16-entry blocks, `IADD3 R2, R2, -0x10, RZ`
+- Normalization phase: `LDL` (64-bit shared memory load), `MUFU.RCP` + `FMUL.FTZ`
+- Predicate-gated stores for up to 7 outcomes
+- Barrier: `BSSY B0`
+- Error handler: `CALL.REL.NOINC 0x1bf0`
+
+### forward_opponent_br_packed (sm_80, ~537 instructions) — Forward opponent best response packed S16
+- Thread setup: `CS2R R10, SRZ` (cycle register), `threadIdx.x - 32`
+- Flag mask: `LOP3.LUT R0, R0, 0x2, RZ, 0xfc, !PT` (mask with 0xfc)
+- Bounds check: `threadIdx.x >= c[0x0][0x1c4]` → EXIT
+- Card extraction: `I2F.U16 R6, UR14` (Q16 dequant), `ULOP3.LUT UR17, UR14, 0x3, URZ, 0xc0, !UPT` (uniform suit)
+- Complex card unpacking: `SHF.L.U64.HI`, `SHF.R.U32.HI`, `SHF.L.U32`, `LOP3.LUT 0xfc`, `LOP3.LUT 0xe2`
+- S16 packed load: `LDG.E.U16.CONSTANT`, `I2F.U32` conversion
+- Shared memory store: `STL [R24], R28` (S16 packed)
+- Accumulation: `FADD.FTZ R26, R28, R3`
+- Normalization phase: `LDL` (shared memory load), `MUFU.RCP` + `FMUL.FTZ`
+- Predicate-gated stores for up to 7 outcomes
+- Barrier: `BSSY B0`
+- Error handler: `BSYNC B0` then `EXIT`
+
+### backward_chance_turn_river_batched (sm_80, ~209 instructions) — Batched backward chance
+- Single grid dimension (no 2D y): `threadIdx.x >= c[0x0][0x1a0]` → BRA
+- Chance probability: `I2F.U32.RP` + `MUFU.RCP` (1.0f / num_outcomes)
+- Card index: modulo via `IMAD.HI.U32` 64-bit multiply
+- Dead card check: `PRMT R9, R14, 0x9910, RZ` + `ISETP.NE.AND P1, PT, R9, -0x1, PT`
+- Atomic spin lock: `ATOMS.CAST.SPIN` + spin-wait loop
+- Second phase: loads 4 values from shared memory (`LDS`), stores 4 to global (`STG.E`)
+
+### evaluate_fold_3p (sm_80, ~665 instructions) — 3-player fold equity
+- Card loading: `LDG.E.U8.CONSTANT` for 3 board cards
+- Suit extraction: `LOP3.LUT P0, R2, R2, 0x3, RZ, 0xc0, !PT` (suit = card & 3)
+- Fold probability: `I2F.U32.RP` + `MUFU.RCP` (1.0f / num_opponents)
+- Dead card detection: 6-way `ISETP.EQ.OR` chain comparing board vs hole cards
+- Additional checks vs hole cards (R21, R19) with `PLOP3.LUT 0xa8` combine
+- Double-precision EV: `F2F.F64.F32` (float→double), `DADD` chains
+- Atomic spin lock: `ATOMS.CAST.SPIN` for shared memory accumulation
+- Warp butterfly reduction: `SHFL.BFLY PT, R*, R*, 0x10/0x8/0x4/0x2/0x1, 0x1f` (5 steps)
+- Denormal flush: `DSETP.GEU.AND P0, PT, |R6|, c[0x2][0x0], PT` + `FMUL R11, R11, 1.175e-38`
+- Output: `STG.E [R2.64], R11` (double EV) or `STG.E [R2.64], RZ` (zero)
+
+### evaluate_fold_abstract (sm_80, ~201 instructions) — Abstract fold equity
+- Value loading: `LDG.E.CONSTANT` from pointer tables
+- Accumulation: `FADD.FTZ R4, R9, R4` (sum += value)
+- Shared memory: `STS [R13], R4` (store accumulator)
+- Two-level shared memory reduction: `LDS` / `FADD.FTZ R6, R6, R3` / `STS [R13], R6`
+- Probability: `I2F.U32.RP` + `MUFU.RCP` (1.0f / num_outcomes)
+- Card index: modulo via `IMAD.HI.U32` 64-bit multiply
+- Output: `STG.E [R8.64], R11` (normalized result) or `STG.E [R8.64], R0` (zero)
+- Multiple output stores (up to 4 values) with predicate-gated addressing
 
 ### Key SASS instruction reference
 | Instruction | Meaning |
