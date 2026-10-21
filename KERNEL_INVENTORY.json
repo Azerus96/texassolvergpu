@@ -1,0 +1,1694 @@
+{
+  "sm_120": {
+    "evaluate_showdown_abstract": {
+      "code_size": 4992,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_abstract": {
+      "code_size": 4352,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_tr_2d": {
+      "code_size": 6656,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_tr_2d": {
+      "code_size": 6656,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river_batched": {
+      "code_size": 7040,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river_batched": {
+      "code_size": 7040,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river": {
+      "code_size": 7040,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river": {
+      "code_size": 7040,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_abstract": {
+      "code_size": 2688,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_abstract": {
+      "code_size": 6144,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix_3p": {
+      "code_size": 14464,
+      "shared_mem": 1056,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute_3p": {
+      "code_size": 9344,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_3p": {
+      "code_size": 24192,
+      "shared_mem": 1712,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism_permuted": {
+      "code_size": 1792,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent_boundary_iso": {
+      "code_size": 6016,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism": {
+      "code_size": 1792,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "encode_stage_segments_i16": {
+      "code_size": 3968,
+      "shared_mem": 1168,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "gather_cfv": {
+      "code_size": 640,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv_packed": {
+      "code_size": 10496,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv": {
+      "code_size": 6144,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_br_player": {
+      "code_size": 3840,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br_packed": {
+      "code_size": 9984,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br": {
+      "code_size": 5760,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent": {
+      "code_size": 2816,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_a2": {
+      "code_size": 4864,
+      "shared_mem": 1056,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_cached": {
+      "code_size": 19968,
+      "shared_mem": 1056,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed": {
+      "code_size": 26624,
+      "shared_mem": 1056,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player": {
+      "code_size": 12544,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_small_tree_fp32_multi_iter": {
+      "code_size": 46208,
+      "shared_mem": 5664,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance": {
+      "code_size": 1792,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_river_subtrees_packed": {
+      "code_size": 17280,
+      "shared_mem": 1072,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_packed": {
+      "code_size": 14208,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_opponent_fold_showdown_parent_packed": {
+      "code_size": 25984,
+      "shared_mem": 1632,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_opponent_fold_showdown_parent": {
+      "code_size": 29312,
+      "shared_mem": 1632,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_fold_showdown_parent_packed": {
+      "code_size": 7552,
+      "shared_mem": 1056,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_fold_showdown_parent_packed": {
+      "code_size": 27520,
+      "shared_mem": 1344,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent": {
+      "code_size": 6272,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_player": {
+      "code_size": 1664,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_copy": {
+      "code_size": 5120,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_showdown_prefix": {
+      "code_size": 45056,
+      "shared_mem": 1616,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix": {
+      "code_size": 35200,
+      "shared_mem": 1264,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute": {
+      "code_size": 9856,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown": {
+      "code_size": 9216,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_fp32": {
+      "code_size": 17024,
+      "shared_mem": 1376,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold": {
+      "code_size": 24832,
+      "shared_mem": 1712,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "reserved.0": {
+      "code_size": 0,
+      "shared_mem": 64,
+      "constant_mem": 0
+    },
+    "constant0": {
+      "code_size": 0,
+      "shared_mem": 0,
+      "constant_mem": 45716
+    }
+  },
+  "sm_75": {
+    "constant0": {
+      "code_size": 0,
+      "shared_mem": 0,
+      "constant_mem": 21236
+    },
+    "constant2": {
+      "code_size": 0,
+      "shared_mem": 0,
+      "constant_mem": 24
+    },
+    "evaluate_showdown_abstract": {
+      "code_size": 5248,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_abstract": {
+      "code_size": 2944,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_tr_2d": {
+      "code_size": 2304,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_tr_2d": {
+      "code_size": 2304,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river_batched": {
+      "code_size": 3200,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river_batched": {
+      "code_size": 3200,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river": {
+      "code_size": 3200,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river": {
+      "code_size": 3200,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_abstract": {
+      "code_size": 2304,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_abstract": {
+      "code_size": 2944,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix_3p": {
+      "code_size": 11520,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute_3p": {
+      "code_size": 4480,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_3p": {
+      "code_size": 10624,
+      "shared_mem": 688,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism_permuted": {
+      "code_size": 2176,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent_boundary_iso": {
+      "code_size": 6016,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism": {
+      "code_size": 1280,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "encode_stage_segments_i16": {
+      "code_size": 3712,
+      "shared_mem": 144,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "gather_cfv": {
+      "code_size": 384,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv_packed": {
+      "code_size": 6912,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv": {
+      "code_size": 7168,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_br_player": {
+      "code_size": 3456,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br_packed": {
+      "code_size": 6528,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br": {
+      "code_size": 6912,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent": {
+      "code_size": 3328,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_a2": {
+      "code_size": 4864,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_cached": {
+      "code_size": 19456,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed": {
+      "code_size": 24960,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player": {
+      "code_size": 11264,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_small_tree_fp32_multi_iter": {
+      "code_size": 52096,
+      "shared_mem": 4640,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance": {
+      "code_size": 2688,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_river_subtrees_packed": {
+      "code_size": 18304,
+      "shared_mem": 48,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_packed": {
+      "code_size": 14336,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_opponent_fold_showdown_parent_packed": {
+      "code_size": 25600,
+      "shared_mem": 608,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_opponent_fold_showdown_parent": {
+      "code_size": 28288,
+      "shared_mem": 608,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_fold_showdown_parent_packed": {
+      "code_size": 6912,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_fold_showdown_parent_packed": {
+      "code_size": 23424,
+      "shared_mem": 320,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent": {
+      "code_size": 7680,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_player": {
+      "code_size": 2688,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_copy": {
+      "code_size": 6784,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_showdown_prefix": {
+      "code_size": 54016,
+      "shared_mem": 592,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix": {
+      "code_size": 43904,
+      "shared_mem": 240,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute": {
+      "code_size": 5120,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown": {
+      "code_size": 7296,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_fp32": {
+      "code_size": 9600,
+      "shared_mem": 352,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold": {
+      "code_size": 10752,
+      "shared_mem": 688,
+      "constant_mem": 0,
+      "flags": 6
+    }
+  },
+  "sm_80": {
+    "constant0": {
+      "code_size": 0,
+      "shared_mem": 0,
+      "constant_mem": 21236
+    },
+    "constant2": {
+      "code_size": 0,
+      "shared_mem": 0,
+      "constant_mem": 24
+    },
+    "evaluate_showdown_abstract": {
+      "code_size": 5248,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_abstract": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_tr_2d": {
+      "code_size": 2176,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_tr_2d": {
+      "code_size": 2176,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river_batched": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river_batched": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_abstract": {
+      "code_size": 2304,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_abstract": {
+      "code_size": 2944,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix_3p": {
+      "code_size": 11520,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute_3p": {
+      "code_size": 4608,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_3p": {
+      "code_size": 10496,
+      "shared_mem": 688,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism_permuted": {
+      "code_size": 2304,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent_boundary_iso": {
+      "code_size": 6272,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism": {
+      "code_size": 1408,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "encode_stage_segments_i16": {
+      "code_size": 3712,
+      "shared_mem": 144,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "gather_cfv": {
+      "code_size": 512,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv_packed": {
+      "code_size": 7168,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv": {
+      "code_size": 7296,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_br_player": {
+      "code_size": 3712,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br_packed": {
+      "code_size": 6656,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br": {
+      "code_size": 6912,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent": {
+      "code_size": 3328,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_a2": {
+      "code_size": 4864,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_cached": {
+      "code_size": 19840,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed": {
+      "code_size": 25088,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player": {
+      "code_size": 11392,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_small_tree_fp32_multi_iter": {
+      "code_size": 50176,
+      "shared_mem": 4640,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance": {
+      "code_size": 2816,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_river_subtrees_packed": {
+      "code_size": 17920,
+      "shared_mem": 48,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_packed": {
+      "code_size": 14080,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_opponent_fold_showdown_parent_packed": {
+      "code_size": 25216,
+      "shared_mem": 608,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_opponent_fold_showdown_parent": {
+      "code_size": 26752,
+      "shared_mem": 608,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_fold_showdown_parent_packed": {
+      "code_size": 6912,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_fold_showdown_parent_packed": {
+      "code_size": 23040,
+      "shared_mem": 320,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent": {
+      "code_size": 7680,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_player": {
+      "code_size": 2688,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_copy": {
+      "code_size": 6784,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_showdown_prefix": {
+      "code_size": 53120,
+      "shared_mem": 592,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix": {
+      "code_size": 42880,
+      "shared_mem": 240,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute": {
+      "code_size": 5376,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown": {
+      "code_size": 7296,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_fp32": {
+      "code_size": 9344,
+      "shared_mem": 352,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold": {
+      "code_size": 10496,
+      "shared_mem": 688,
+      "constant_mem": 0,
+      "flags": 6
+    }
+  },
+  "sm_86": {
+    "constant0": {
+      "code_size": 0,
+      "shared_mem": 0,
+      "constant_mem": 21236
+    },
+    "constant2": {
+      "code_size": 0,
+      "shared_mem": 0,
+      "constant_mem": 24
+    },
+    "evaluate_showdown_abstract": {
+      "code_size": 5376,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_abstract": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_tr_2d": {
+      "code_size": 2176,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_tr_2d": {
+      "code_size": 2176,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river_batched": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river_batched": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_abstract": {
+      "code_size": 2304,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_abstract": {
+      "code_size": 2944,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix_3p": {
+      "code_size": 11392,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute_3p": {
+      "code_size": 4608,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_3p": {
+      "code_size": 10368,
+      "shared_mem": 688,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism_permuted": {
+      "code_size": 2304,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent_boundary_iso": {
+      "code_size": 6272,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism": {
+      "code_size": 1408,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "encode_stage_segments_i16": {
+      "code_size": 3712,
+      "shared_mem": 144,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "gather_cfv": {
+      "code_size": 512,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv_packed": {
+      "code_size": 7168,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv": {
+      "code_size": 7296,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_br_player": {
+      "code_size": 3584,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br_packed": {
+      "code_size": 6656,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br": {
+      "code_size": 6912,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent": {
+      "code_size": 3328,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_a2": {
+      "code_size": 4864,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_cached": {
+      "code_size": 19328,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed": {
+      "code_size": 24960,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player": {
+      "code_size": 11392,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_small_tree_fp32_multi_iter": {
+      "code_size": 49920,
+      "shared_mem": 4640,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance": {
+      "code_size": 2816,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_river_subtrees_packed": {
+      "code_size": 17792,
+      "shared_mem": 48,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_packed": {
+      "code_size": 13952,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_opponent_fold_showdown_parent_packed": {
+      "code_size": 24704,
+      "shared_mem": 608,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_opponent_fold_showdown_parent": {
+      "code_size": 27520,
+      "shared_mem": 608,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_fold_showdown_parent_packed": {
+      "code_size": 6912,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_fold_showdown_parent_packed": {
+      "code_size": 23168,
+      "shared_mem": 320,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent": {
+      "code_size": 7680,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_player": {
+      "code_size": 2688,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_copy": {
+      "code_size": 6784,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_showdown_prefix": {
+      "code_size": 52736,
+      "shared_mem": 592,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix": {
+      "code_size": 42368,
+      "shared_mem": 240,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute": {
+      "code_size": 5120,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown": {
+      "code_size": 7296,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_fp32": {
+      "code_size": 9344,
+      "shared_mem": 352,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold": {
+      "code_size": 10496,
+      "shared_mem": 688,
+      "constant_mem": 0,
+      "flags": 6
+    }
+  },
+  "sm_89": {
+    "constant0": {
+      "code_size": 0,
+      "shared_mem": 0,
+      "constant_mem": 21236
+    },
+    "constant2": {
+      "code_size": 0,
+      "shared_mem": 0,
+      "constant_mem": 24
+    },
+    "evaluate_showdown_abstract": {
+      "code_size": 5376,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_abstract": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_tr_2d": {
+      "code_size": 2176,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_tr_2d": {
+      "code_size": 2176,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river_batched": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river_batched": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river": {
+      "code_size": 3072,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_abstract": {
+      "code_size": 2304,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_abstract": {
+      "code_size": 2944,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix_3p": {
+      "code_size": 11392,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute_3p": {
+      "code_size": 4608,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_3p": {
+      "code_size": 10368,
+      "shared_mem": 688,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism_permuted": {
+      "code_size": 2304,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent_boundary_iso": {
+      "code_size": 6272,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism": {
+      "code_size": 1408,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "encode_stage_segments_i16": {
+      "code_size": 3712,
+      "shared_mem": 144,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "gather_cfv": {
+      "code_size": 512,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv_packed": {
+      "code_size": 7168,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv": {
+      "code_size": 7296,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_br_player": {
+      "code_size": 3584,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br_packed": {
+      "code_size": 6656,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br": {
+      "code_size": 6912,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent": {
+      "code_size": 3328,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_a2": {
+      "code_size": 4864,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_cached": {
+      "code_size": 19328,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed": {
+      "code_size": 24960,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player": {
+      "code_size": 11392,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_small_tree_fp32_multi_iter": {
+      "code_size": 49920,
+      "shared_mem": 4640,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance": {
+      "code_size": 2816,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_river_subtrees_packed": {
+      "code_size": 17792,
+      "shared_mem": 48,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_packed": {
+      "code_size": 13952,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_opponent_fold_showdown_parent_packed": {
+      "code_size": 24704,
+      "shared_mem": 608,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_opponent_fold_showdown_parent": {
+      "code_size": 27520,
+      "shared_mem": 608,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_fold_showdown_parent_packed": {
+      "code_size": 6912,
+      "shared_mem": 32,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_fold_showdown_parent_packed": {
+      "code_size": 23168,
+      "shared_mem": 320,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent": {
+      "code_size": 7680,
+      "shared_mem": 16,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_player": {
+      "code_size": 2688,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_copy": {
+      "code_size": 6784,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_showdown_prefix": {
+      "code_size": 52736,
+      "shared_mem": 592,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix": {
+      "code_size": 42368,
+      "shared_mem": 240,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute": {
+      "code_size": 5120,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown": {
+      "code_size": 7296,
+      "shared_mem": 0,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_fp32": {
+      "code_size": 9344,
+      "shared_mem": 352,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold": {
+      "code_size": 10496,
+      "shared_mem": 688,
+      "constant_mem": 0,
+      "flags": 6
+    }
+  },
+  "sm_90": {
+    "evaluate_showdown_abstract": {
+      "code_size": 5760,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_abstract": {
+      "code_size": 3200,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_tr_2d": {
+      "code_size": 2560,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_tr_2d": {
+      "code_size": 2560,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river_batched": {
+      "code_size": 3456,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river_batched": {
+      "code_size": 3456,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_turn_river": {
+      "code_size": 3456,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_turn_river": {
+      "code_size": 3456,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_chance_abstract": {
+      "code_size": 2560,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance_abstract": {
+      "code_size": 3200,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix_3p": {
+      "code_size": 12928,
+      "shared_mem": 1056,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute_3p": {
+      "code_size": 5120,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_3p": {
+      "code_size": 12160,
+      "shared_mem": 1712,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism_permuted": {
+      "code_size": 2304,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent_boundary_iso": {
+      "code_size": 6784,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "apply_isomorphism": {
+      "code_size": 1792,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "encode_stage_segments_i16": {
+      "code_size": 4096,
+      "shared_mem": 1168,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "gather_cfv": {
+      "code_size": 640,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv_packed": {
+      "code_size": 8064,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_cfv": {
+      "code_size": 8064,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_br_player": {
+      "code_size": 3968,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br_packed": {
+      "code_size": 7168,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_br": {
+      "code_size": 7552,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_opponent": {
+      "code_size": 3456,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_a2": {
+      "code_size": 5504,
+      "shared_mem": 1056,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed_cached": {
+      "code_size": 21120,
+      "shared_mem": 1056,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player_packed": {
+      "code_size": 27776,
+      "shared_mem": 1056,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "backward_player": {
+      "code_size": 12032,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_small_tree_fp32_multi_iter": {
+      "code_size": 51968,
+      "shared_mem": 5664,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_chance": {
+      "code_size": 2944,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_river_subtrees_packed": {
+      "code_size": 18688,
+      "shared_mem": 1072,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent_packed": {
+      "code_size": 15616,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_opponent_fold_showdown_parent_packed": {
+      "code_size": 27776,
+      "shared_mem": 1632,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_opponent_fold_showdown_parent": {
+      "code_size": 29440,
+      "shared_mem": 1632,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_mixed_fold_showdown_parent_packed": {
+      "code_size": 7680,
+      "shared_mem": 1056,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "train_fold_showdown_parent_packed": {
+      "code_size": 25344,
+      "shared_mem": 1344,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_opponent": {
+      "code_size": 8320,
+      "shared_mem": 1040,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_player": {
+      "code_size": 2816,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "forward_copy": {
+      "code_size": 6912,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_showdown_prefix": {
+      "code_size": 56960,
+      "shared_mem": 1616,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_prefix": {
+      "code_size": 46592,
+      "shared_mem": 1264,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown_brute": {
+      "code_size": 5760,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_showdown": {
+      "code_size": 8064,
+      "shared_mem": 1024,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold_fp32": {
+      "code_size": 10624,
+      "shared_mem": 1376,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "evaluate_fold": {
+      "code_size": 12416,
+      "shared_mem": 1712,
+      "constant_mem": 0,
+      "flags": 6
+    },
+    "reserved.0": {
+      "code_size": 0,
+      "shared_mem": 0,
+      "constant_mem": 0
+    },
+    "constant0": {
+      "code_size": 0,
+      "shared_mem": 0,
+      "constant_mem": 29156
+    }
+  }
+}
