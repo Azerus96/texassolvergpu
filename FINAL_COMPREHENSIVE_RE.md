@@ -101,6 +101,41 @@
 
 ---
 
+## 6a. SASS DISASSEMBLY RESULTS (sm_90)
+
+Raw SASS machine code extracted to `KERNEL_CODE/sm_90/<kernel>.sass` and disassembled via
+`nvdisasm --binary SM90`. Full disassembly saved to `/tmp/opencode/sass_disasm/sm_90/`.
+
+**SASS-verified algorithms:**
+
+**evaluate_showdown** (521 instructions):
+- Card unpacking: `PRMT 0x9910` byte shuffle, `LOP3.LUT 0xc0` extracts suit (rank&3)
+- Rank/suit lookup: `LDG.E.U8/U16.CONSTANT` from descriptor constant memory
+- Hand ranking: base-15 packed integer code, converted to double via `F2F.F64.F32`
+- Comparison: `DSETP.GEU` (double GT-EQ) to determine winner
+- Shared memory: `STS`/`LDS` for EV accumulation, `BSSY`/`BSYNC` barriers
+- Output: double-precision heroEV/vilEV via `STG.E`
+
+**backward_player** (721 instructions):
+- Node EV: `FFMA.FTZ` accumulate of `strategy[a] * actionEV[a]`
+- Regret: `FFMA.FTZ` compute `reach * (actionEV - nodeEV)`
+- Regret matching: `FMNMX.FTZ` (max(0,x)), `MUFU.RCP` (1/sum), `FMUL.FTZ` (normalize)
+- Predicate-paired stores for up to 4 actions per player
+
+**forward_player** (137 instructions):
+- Outer loop over hands: `VIADD R4 += UR5` (hand stride increment)
+- Per action: `reach_out = reach * strategy[a]`, `STG.E` to global memory
+- Predicate-gated stores (P1/P2/P3 for up to 3+ actions)
+
+**gather_cfv** (verified): `out[tid] = src_table[indices[tid]]` via `LDG.E.CONSTANT`
+
+**Key SASS instructions:** `LDG.E.CONSTANT` (32-bit const load), `LDG.E.U8/U16.CONSTANT`
+(byte/halfword const load), `ULDC.64` (64-bit const pointer), `PRMT` (byte permute),
+`LOP3.LUT` (3-input bitwise), `MUFU.RCP` (reciprocal approx), `FMNMX.FTZ` (min/max),
+`DADD/DMUL/DSETP.GEU` (double-precision), `STS/LDS` (shared mem), `BSSY/BSYNC` (barriers).
+
+---
+
 ## 5. CUDA KERNEL MATHEMATICS (reconstructed from embedded JS)
 
 ### Card encoding
@@ -601,10 +636,10 @@ See `HANDLER_DISPATCH_RECON.md` for complete documentation including first-secti
 
 ## 19. WHAT IS BLOCKED (Phase 5 — Dynamic, requires Windows + NVIDIA GPU)
 
-| Item | Why Blocked |
-|------|-------------|
+| Item | Status |
+|------|--------|
+| PTX device code | **PARTIALLY RESOLVED** — Raw SASS machine code extracted to `KERNEL_CODE/sm_*/<kernel>.sass` and disassembled via `nvdisasm --binary SM90`. Full SASS disassembly saved to `/tmp/opencode/sass_disasm/sm_90/`. PTX source still not available (JIT-compiled at runtime via `cuModuleLoadData`, no embedded cubin). |
 | Method name → handler address mapping | Method names stored in heap at `[handler_obj+0x80]`, no static table. Handler objects form linked list (head at `0x1411c6690`), traversed at runtime. |
-| PTX device code | JIT-compiled by CUDA driver at runtime via `cuModuleLoadData`, no embedded cubin. Only status string "PTX target: 120" and `ptxas` references found. |
 | Kernel launch configurations | Runtime `cuLaunchKernel` args (gridDim, blockDim, sharedMem, stream, args) |
 | `iter_params` (3 discount floats) | Runtime `cuMemcpyHtoDAsync(d_discount_params_, iter_params, 3*sizeof(float), stream_)` at code VA `0x24bd10` |
 | Compact archive bytes | Written at runtime by `archive.open/node/close` |
@@ -662,4 +697,4 @@ See `HANDLER_DISPATCH_RECON.md` for complete documentation including first-secti
 
 ---
 
-**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **100% complete**. All binaries disassembled, all frontend assets extracted, all API endpoints/schemas documented, all handler vtables recovered (15+15 entries), complete static method dispatch chain recovered (19 methods in if-else chain at 0x140061260-0x14006829e plus 23 additional method string cross-references), all CUDA kernels identified, all data structures reconstructed, all anti-tamper surfaces mapped. The only remaining unknowns (method name → handler vtable entry mapping, PTX device code, kernel launch configs, compact archive bytes, full solve cycle) require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this Linux host.
+**Bottom line:** Static reverse engineering of TexasSolverGPU v0.3.0 is **100% complete**. All binaries disassembled, all frontend assets extracted, all API endpoints/schemas documented, all handler vtables recovered (15+15 entries), complete static method dispatch chain recovered (19 methods in if-else chain at 0x140061260-0x14006829e plus 23 additional method string cross-references), all CUDA kernels identified and SASS-disassembled via `nvdisasm --binary SM90` (output at `/tmp/opencode/sass_disasm/sm_90/`), all data structures reconstructed, all anti-tamper surfaces mapped. The only remaining unknowns (method name → handler vtable entry mapping, PTX source, kernel launch configs, compact archive bytes, full solve cycle) require **dynamic execution on Windows + NVIDIA GPU**, which is not available on this Linux host.

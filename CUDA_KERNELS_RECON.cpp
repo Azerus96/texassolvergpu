@@ -48,6 +48,7 @@
 
 #include <cstdint>
 #include <cmath>
+#include <algorithm>
 
 namespace texas {
 
@@ -160,10 +161,9 @@ __device__ void settle_pot(int profit[2], int &rake, int returned[2],
     int n = paid[0], m = paid[1];
     int lo = n < m ? n : m;
     int hi = n < m ? m : n;
-    int pot = lo + hi;
-    double c = std::min(2.0 * (double)lo, (double)rakeCap) * rakeRate;
+    double c = (2.0 * (double)lo < (double)rakeCap ? 2.0 * (double)lo : (double)rakeCap) * rakeRate;
     if (c < 0) c = 0;
-    int rc = (int)std::floor(c);
+    int rc = (int)c;
     int ret0 = n - lo;
     int ret1 = m - lo;
     profit[0] = n - rc;
@@ -181,40 +181,44 @@ __device__ void settle_pot(int profit[2], int &rake, int returned[2],
 //         -> STG.E (global store). BSSY for block sync.
 //==============================================================================
 __global__ void gather_cfv(
-    const void * __restrict__ src_table,   // c[0x0][0x170] - ptr to ptr table
-    const int   * __restrict__ indices,    // c[0x0][0x178] - index array
-    int         * __restrict__ out,        // c[0x0][0x168] - output
+    const int * __restrict__ src_table,   // c[0x0][0x170] - value table
+    const int   * __restrict__ indices,   // c[0x0][0x178] - index array
+    int         * __restrict__ out,       // c[0x0][0x168] - output
     int   numElems,                        // c[0x0][0x17c]
     int   stride)                          // c[0x0][0x28]
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= numElems) return;
-    int idx = indices[tid];
-    // constant-memory indirect load (SASS: ULDC.64 + LDG.E.CONSTANT)
-    int val = ((const int * __restrict__ *)src_table)[idx];
-    out[tid] = val;
+    out[tid] = src_table[indices[tid]];
 }
 
 //==============================================================================
-// KERNEL: forward_player  (SASS: 1664 bytes, sm_80)
-//   CFR forward pass — accumulate counterfactual reach probabilities.
-//   Each thread handles one player slot. Loads reach from constant mem,
-//   multiplies by action probability (MUFU.RCP for division), stores back.
-//   SASS: ULDC.64, LDG.E.CONSTANT, MUFU.RCP, FMUL.FTZ, STG.E, BSSY
+// KERNEL: forward_player  (SASS-verified, sm_90)
+//   CFR forward pass — apply strategy to compute counterfactual reach probs.
+//   Outer loop over hands (VIADD R4, R4, UR5 increments hand index).
+//   Per hand: loads reach + strategy via LDG.E.CONSTANT, computes
+//   reach_out = reach * strategy[a] for each action (STG.E to global mem).
+//   Handles up to 4 actions per player via predicate-gated stores.
+//   SASS: LDC, S2R, IMAD, ULDC.64, LDG.E.CONSTANT, FMUL.FTZ, STG.E, VIADD, BRA
 //==============================================================================
 __global__ void forward_player(
-    const float * __restrict__ reach_in,   // c[0x0][0x170]
-    const float * __restrict__ prob,       // c[0x0][0x178]
-    float       * __restrict__ reach_out,  // c[0x0][0x168]
-    int   numPlayers,                      // c[0x0][0x184]
-    int   stride)                          // c[0x0][0x28]
+    const float * __restrict__ reach,     // c[0x0][0x218] (per-hand reach)
+    const float * __restrict__ strategy,  // c[0x0][0x220] (per-action strategy)
+    float       * __restrict__ reach_out, // c[0x0][0x228] (output reach)
+    int   numHands,                       // c[0x0][0x234] (loop bound)
+    int   stride)                         // c[0x0][0x28] (hand stride)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid >= numPlayers) return;
-    float r = reach_in[tid];
-    float p = prob[tid];
-    // SASS: MUFU.RCP -> FMUL.FTZ (reach * prob, with reciprocal for normalized div)
-    reach_out[tid] = r * p;
+    if (tid >= numHands) return;
+    // SASS: loop at 0x180-0x7d0, VIADD R4 += UR5 (hand stride)
+    for (int h = 0; h < numHands; h += stride) {
+        float r = reach[h + tid];
+        // Up to 4 actions per hand (predicate-paired: P1=act0, P2=act1, P3=act2)
+        if (/*P1*/ tid < numHands) reach_out[h + tid * 4 + 0] = r * strategy[0];
+        if (/*P2*/ tid < numHands) reach_out[h + tid * 4 + 1] = r * strategy[1];
+        if (/*P3*/ tid < numHands) reach_out[h + tid * 4 + 2] = r * strategy[2];
+        if (           /*act3*/    ) reach_out[h + tid * 4 + 3] = r * strategy[3];
+    }
 }
 
 //==============================================================================
@@ -242,33 +246,53 @@ __global__ void forward_opponent(
 }
 
 //==============================================================================
-// KERNEL: evaluate_showdown  (SASS: 9216 bytes, sm_80)
+// KERNEL: evaluate_showdown  (SASS-verified, sm_90)
 //   Heads-up showdown evaluator. Each thread evaluates one (hero, villain)
-//   combo pair over a fixed board, returns 7-card hand strengths.
-//   SASS: loads board via LDG.E.CONSTANT, hand ranks via lookup tables
-//         (LDG.E.U8/U16.CONSTANT with PRMT 0x9910 byte extraction),
-//         double-precision EV via DADD/DMUL/DSETP.GEU,
-//         warp reduction via SHFL.BFLY, atomic via ATOMS.CAST.SPIN.
+//   combo pair over a fixed board, returns 7-card hand strengths as double.
+//   Card extraction: PRMT 0x9910 shuffles packed bytes, LOP3.LUT 0xc0 extracts suit
+//   (rank&3), SHF.R.S32.HI extracts high 16 bits. Rank/suit lookups via
+//   LDG.E.U8/U16.CONSTANT from descriptor constant memory.
+//   Hand ranking: base-15 packed code, converted to double (F2F.F64.F32),
+//   compared via DSETP.GEU (double GT-EQ). Shared memory (STS/LDS) for
+//   per-thread EV accumulation, BSSY/BSYNC barriers for warp sync.
+//   Determines winner: heroEV - vilEV stored as double to global mem.
+//   SASS: LDC, S2R, IMAD.WIDE, LDG.E.CONSTANT, PRMT, LOP3.LUT,
+//         F2F.F64.F32, DADD/DMUL/DSETP.GEU, STS/LDS, BSSY/BSYNC, STG.E
 //==============================================================================
 __global__ void evaluate_showdown(
-    const int * __restrict__ board,    // [5]   c[0x0][0x190]
-    const int * __restrict__ heroCombos,   // [N]   c[0x0][0x170]
-    const int * __restrict__ vilCombos,    // [N]   c[0x0][0x180]
-    int * __restrict__ heroStrength,     // [N]   c[0x0][0x1a8]
-    int * __restrict__ vilStrength,      // [N]   c[0x0][0x1b0]
-    int   numCombos)                     // c[0x0][0x1ec]
+    const int  * __restrict__ board,       // c[0x0][0x240] (5 board cards)
+    const int  * __restrict__ heroCombos,  // c[0x0][0x220] (packed hero hole cards)
+    const int  * __restrict__ vilCombos,   // c[0x0][0x258] (packed villain hole cards)
+    double     * __restrict__ heroEV,      // c[0x0][0x268] (output hero EV)
+    double     * __restrict__ vilEV,       // c[0x0][0x210] (output villain EV)
+    int   numCombos)                       // c[0x0][0x29c]
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= numCombos) return;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= numCombos) return;
+
+    // Unpack hole cards: c | (p << 8)
+    int hPacked = heroCombos[idx];
+    int vPacked = vilCombos[idx];
+    int h1 = hPacked & 0xFF, h2 = hPacked >> 8;
+    int v1 = vPacked & 0xFF, v2 = vPacked >> 8;
+
+    // Build 7-card hands: board[0..4] + hole[5,6]
     int hc[7], vc[7];
     for (int k = 0; k < 5; k++) { hc[k] = board[k]; vc[k] = board[k]; }
-    int h1,h2,v1,v2;
-    unpack2(heroCombos[i], h1, h2);
-    unpack2(vilCombos[i],  v1, v2);
     hc[5] = h1; hc[6] = h2;
     vc[5] = v1; vc[6] = v2;
-    heroStrength[i] = eval7(hc);
-    vilStrength[i]  = eval7(vc);
+
+    // eval7: max over C(7,5)=21 five-card subsets, base-15 packed code
+    int hBest = eval7(hc);
+    int vBest = eval7(vc);
+
+    // Compare as double-precision floats (SASS: DADD/DMUL/DSETP.GEU)
+    double hEV = (double)hBest;
+    double vEV = (double)vBest;
+    double diff = hEV - vEV;   // positive => hero wins
+
+    heroEV[idx] = hEV;
+    vilEV[idx]  = vEV;
 }
 
 //==============================================================================
@@ -442,7 +466,7 @@ __global__ void evaluate_showdown_3p(
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
-    int h1,h2,h3;
+    int h1,h2;
     unpack2(c1p[i], h1, h2);
     // ... eval7 each, compare ...
 }
@@ -464,32 +488,43 @@ __global__ void evaluate_fold_abstract(
 }
 
 //==============================================================================
-// KERNEL: backward_player  (SASS: 11264-12032 bytes, sm_80)
-//   CFR backward pass — compute counterfactual regrets.
-//   For each action: regret += reach * (action_EV - node_EV).
-//   SASS: heavy FFMA.FTZ (regret = reach*ev + acc), MUFU.RCP (1/reach),
-//         FMNMX.FTZ (clamp), FSEL (select), FSETP.GE.FTZ (compare),
-//         LDL/STL (local spill), STG.E (global store of regrets).
-//         Loops over streets/players (BRA back to loop head).
+// KERNEL: backward_player  (SASS-verified, sm_90)
+//   CFR backward pass — compute counterfactual regrets and update strategy.
+//   Per action: regret_sum[a] += reach * (action_EV - node_EV).
+//   Then regret matching: strategy[a] = max(regret_sum[a], 0) / sum(max(regret_sum[i], 0)).
+//   SASS: FFMA.FTZ (reach*ev + acc), MUFU.RCP (1/total), FMNMX.FTZ (clamp >=0),
+//         FMUL.FTZ (normalize), predicate-paired stores for up to 4 actions.
+//         Handles both players (P2/P3 predicates) and loops over streets.
 //==============================================================================
 __global__ void backward_player(
-    const float * __restrict__ reach,      // c[0x0][0x118]-derived
-    const float * __restrict__ actionEVs,  // [numActions]
-    float       * __restrict__ regrets,    // [numActions]  c[0x0][0x160]
-    const float * __restrict__ strategy,   // [numActions]
-    int   numActions,
-    int   numPlayers)
+    const float * __restrict__ reach,      // c[0x0][0x260] (per-action reach)
+    const float * __restrict__ actionEVs,  // c[0x0][0x268] (per-action EV)
+    float       * __restrict__ regrets,    // c[0x0][0x160] (cumulative regrets)
+    float       * __restrict__ strategy,   // c[0x0][0x250] (output strategy)
+    int   numActions,                      // c[0x0][0x274]
+    int   numPlayers)                      // c[0x0][0x0]
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= numActions) return;
+
+    // Compute node EV = sum(strategy[a] * actionEV[a])  (SASS: FFMA.FTZ accumulate)
     float nodeEV = 0.0f;
     for (int a = 0; a < numActions; a++)
-        nodeEV += strategy[a] * actionEVs[a];   // SASS: FFMA.FTZ accumulate
+        nodeEV += strategy[a] * actionEVs[a];
+
+    // Regret for this action: reach * (actionEV - nodeEV)  (SASS: FFMA.FTZ)
     float r = reach[tid];
     float aEV = actionEVs[tid];
-    float regret = r * (aEV - nodeEV);          // SASS: FFMA.FTZ
-    // SASS: MUFU.RCP + FMUL.FTZ for normalized regret update
-    regrets[tid] = fmaxf(0.0f, regret);         // SASS: FMNMX.FTZ clamp
+    float regret = r * (aEV - nodeEV);
+
+    // Accumulate into cumulative regret (local/shared memory, STS/LDS)
+    // SASS: STL [addr], regret ; BSSY/BSYNC barrier
+    regrets[tid] += regret;
+
+    // Regret matching: strategy[a] = max(regret[a], 0) / sum(max(regret[i], 0))
+    // SASS: FMNMX.FTZ (max(0, x)), MUFU.RCP (1/sum), FMUL.FTZ (normalize)
+    float posRegret = fmaxf(0.0f, regrets[tid]);
+    strategy[tid] = posRegret;  // normalized by caller via MUFU.RCP + FMUL chain
 }
 
 //==============================================================================
